@@ -32,7 +32,8 @@ description: HydroGuard KG geolocation and risk map (P0). Use when implementing 
 - Тайлы: `https://tile.openstreetmap.org/{z}/{x}/{y}.png` + обязательная атрибуция «© OpenStreetMap contributors».
   Соблюдай OSM Tile Usage Policy (без массовой предзагрузки; см. `hydroguard-offline-pwa`).
 - Иконки маркеров: не используй дефолтный `L.Icon.Default` (ломается в Vite из-за путей) — делай `L.divIcon`
-  с цветом + символом риска (зелёный ✓ / жёлтый ! / красный ⚠ / серый ? для «без оценки»).
+  с цветом + SVG-иконкой риска (зелёный — галочка, жёлтый — восклицательный знак, красный — треугольник-предупреждение,
+  серый — вопрос для «без оценки»). Цвета — из токенов дизайн-системы.
 - Кластеризация: `MarkerClusterGroup` из `react-leaflet-cluster` (подключи его CSS в чанке карты).
 - Popup/карточка: фото (lazy `<img loading="lazy">`), риск, рекомендации, дата, статус, бейдж «Демо» для `is_demo`.
 - Фильтры: риск, период (7/30 дней/всё), статус — в URL search params, чтобы ссылкой можно было поделиться.

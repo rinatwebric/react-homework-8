@@ -65,6 +65,8 @@ npx supabase functions deploy <name>    # деплой функции
 - TypeScript strict, без `any`. Данные извне (AI, API, IndexedDB, формы) валидируются `zod`.
 - Каждый экран: состояния loading / error / empty. Error boundary на роутах — **никогда белого экрана**.
 - Mobile-first от 360 px, крупные кнопки (≥ 48 px), риск показывается **цветом + иконкой + текстом**.
+- Красный/жёлтый/зелёный зарезервированы под уровни риска — бренд-цвет и кнопки делай другими (например, синий).
+  Дизайн-токены — в `@theme` (Tailwind v4) в `src/index.css`; иконки — SVG (lucide), не эмодзи.
 - Все тексты интерфейса — через `t('...')`, ключи в `src/locales/ru.json` (+ `ky.json`). Без хардкода.
   Кыргызский перевод не выдумывай: оставь `TODO-ky`-ключи списком в PR для проверки носителем языка.
 - Ленивая загрузка: `/map` и `/admin` — `React.lazy`; Leaflet и его CSS только в чанке карты.
@@ -92,7 +94,9 @@ npx supabase functions deploy <name>    # деплой функции
 | Web Push, VAPID, подписки | `hydroguard-web-push` |
 | Open-Meteo, баннер, расписание | `hydroguard-weather` |
 | Флаги, заморозка, демо, приёмка | `hydroguard-demo-readiness` |
-| UI/дизайн | `frontend-design`, `web-design-guidelines` |
+| Дизайн-система, палитра, шрифты, UX-правила | `ui-ux-pro-max` → `tailwind-design-system` |
+| Новый экран / внешний вид | `frontend-design` |
+| Ревью UI, доступность | `web-design-guidelines` |
 | Производительность React | `vercel-react-best-practices`, `vercel-composition-patterns` |
 | E2E-проверка в браузере | `webapp-testing` (Playwright) |
 | Деплой / слайды | `deploy-to-vercel` / `pptx` |
