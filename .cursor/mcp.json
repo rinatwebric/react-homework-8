@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "context7": {
+      "url": "https://mcp.context7.com/mcp"
+    },
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest"]
+    },
+    "supabase": {
+      "url": "https://mcp.supabase.com/mcp?read_only=true&features=docs,database,debugging,development,functions,storage"
+    }
+  }
+}

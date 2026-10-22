@@ -22,3 +22,15 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Env (секреты не коммитим; образец — .env.example)
+.env
+.env.*
+!.env.example
+
+# Supabase CLI
+supabase/.temp
+supabase/.branches
+
+# Hoplite attachments
+.hoplite/
