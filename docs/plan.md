@@ -10,8 +10,10 @@
   (нужны для демо-фото и калибровки). Агент без фотографий пилота этот пункт закрыть не может.
 - **Следующий шаг — срез 2.** Не начинать срез 3, пока не пройдена контрольная точка среза 2
   (правило из `AGENTS.md`: P(n+1) только после работающего P(n)).
-- **Срез 2, PR-1 (форма отчёта + `submit-report`) — код готов, не задеплоен.** Осталось: `db push`,
-  `functions deploy submit-report`, проверка с телефона. PR-2 (карта страны, зоны, метки) — после неё.
+- **Срез 2, PR-1 (форма отчёта + `submit-report`) — задеплоен 2026-10-24** (миграция
+  `20261024120000_report_submit` + функция `submit-report` v3), прод-смоук пройден. Осталось только
+  подтверждение человеком с телефона: скан → «Сообщить о воде» → отправка → «Спасибо, отчёт принят».
+  Дальше PR-2 (карта страны, зоны, метки).
 - Все ветки прошлых PR смержены и удалены; работаем от `main` через короткую ветку + PR.
 
 ## Срез 0 — каркас (1–2 ч) · скиллы: `suutech-offline-pwa`, `deploy-to-vercel`, `suutech-backend`
@@ -40,12 +42,23 @@
 - [x] Обязательная геопозиция, предупреждение о точности, перетаскивание метки, экран «доступ запрещён»
 - [x] `submit-report` (идемпотентность `client_id`, лимиты 10/час устройство + 30/час сеть), миграция `20261024120000_report_submit.sql`
 - [x] PR-1 смерджен в `main` (squash `85ed6de`, PR #17) 2026-10-24 — прод Vercel собирается из `main`
-- [ ] Деплой БД и функции: `npx supabase db push` + `npx supabase functions deploy submit-report`.
-  **Блокер 2026-10-24:** CLI залогинен под аккаунтом без доступа к проекту (`projects list` показывает только
-  чужой проект, `db push --linked` → 403 «login role»), пароля БД в `supabase/.temp/pooler-url` нет.
-  Нужно `npx supabase login` под владельцем `ljwyrvyzvuxauylmtosp` **или** SQL Editor + `db push --password`.
-  Пока функции нет, `/report` отвечает «Сервис отчётов недоступен» (`SERVER`) — это ожидаемо.
-- [ ] Прогон с телефона: скан → «Сообщить о воде» → геопозиция → отправка → «Спасибо, отчёт принят»
+- [x] Деплой БД и функции — 2026-10-24, прод `ljwyrvyzvuxauylmtosp`:
+  миграция `20261024120000_report_submit` применена и записана в `supabase_migrations.schema_migrations`
+  (в базе: `ip_hash`, `reports_ip_hash_sha256`, `reports_photo_belongs_to_client`, индексы
+  `reports_device_hash_created_at_idx` / `reports_ip_hash_created_at_idx`); функция `submit-report`
+  выложена (`ACTIVE`, v3, `verify_jwt=true`, файлы `index.ts` + `_shared/{request,errors,report-schema,cors}.ts`).
+  Как: `npx supabase link` + `functions deploy --use-api` с `SUPABASE_ACCESS_TOKEN` (PAT владельца, в файл
+  не сохранялся), SQL — через Management API `/database/query`, потому что пароля БД под рукой нет.
+  `projects list` и `db push` у CLI 2.122 под этим токеном падают («Cannot find project ref») — не блокер,
+  подробности в `docs/deploy.md` §5.
+- [x] Прод-смоук `submit-report` (2026-10-24, тело по `SubmitReportRequest`): первый POST → 200
+  `{"duplicate":false}`, повтор с тем же `client_id` → тот же `id` + `duplicate:true`; `photo_path` из чужой
+  папки → 400; в БД `lat_public/lng_public` = 42.346/76.168 (округление ~100 м), `zone_id=kg-issyk-ton-ak-olong`,
+  `status=new`, `is_demo=false`, `ip_hash` — 64 hex; `anon` читает `reports_public` (200), а `reports.ip_hash` — 401.
+  Тестовая строка удалена, `reports` пуст.
+- [ ] Прогон с телефона (нужен человек): открыть прод → `/scan` → фото → оценка → «Сообщить о воде» →
+  отказать в геопозиции → метка вручную → «Есть ли вода в подвале?»/глубина колодца → «Отправить» →
+  «Спасибо, отчёт принят»; повторить отправку (должно быть без второго отчёта).
 - [ ] Карта всего Кыргызстана (фокус на Ак-Өлөң): зоны областей/районов из geoBoundaries, 4 уровня риска
 - [ ] Метки `reports_public`: цвет+иконка, кластеры, карточка, фильтры
 - **Контрольная точка:** фото → метка на карте с телефона
