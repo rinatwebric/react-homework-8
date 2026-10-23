@@ -67,6 +67,11 @@ npx supabase link --project-ref <ref>    # ref из URL проекта в даш
 npx supabase db push                     # применит supabase/migrations/*.sql
 ```
 
+Проект SuuTech: `ljwyrvyzvuxauylmtosp` → `https://ljwyrvyzvuxauylmtosp.supabase.co`
+(дашборд: <https://supabase.com/dashboard/project/ljwyrvyzvuxauylmtosp>).
+`login` нужен под тем аккаунтом, у которого есть доступ к этому проекту: чужой аккаунт в CLI
+даёт `Cannot find project ref` и пустой список проектов.
+
 После пуша — перегенерировать типы и заменить файл, написанный руками:
 
 ```bash
@@ -126,11 +131,16 @@ curl -s \
 1. Миграция кэша оценок идёт вместе с остальными: `npx supabase db push`
    (создаёт `photo_assessments`; RLS включён, политик нет — таблицу читает/пишет только функция).
 
-2. Секреты функции (только в Supabase, не в Vercel и не в `.env`):
+2. Секреты функции — **только в Supabase**, Vercel их не видит:
 
    ```bash
    npx supabase secrets set VISION_API_KEY=<ключ vision-модели> VISION_MODEL=<имя модели>
    ```
+
+   ⚠️ Ключ нельзя хранить в переменных Vercel: с префиксом `VITE_` Vite вшивает его в публичный
+   JS-бандл (ключ увидит любой, кто откроет DevTools), без префикса клиент его не читает, а Edge
+   Function всё равно получает только секреты Supabase. Если ключ уже добавлен в Vercel —
+   удалить переменную и **перевыпустить ключ** у провайдера модели.
 
    `VISION_MODEL` можно не задавать — функция возьмёт значение по умолчанию
    (`supabase/functions/_shared/vision.ts`). Ключ без модели = 503 `NOT_CONFIGURED`.

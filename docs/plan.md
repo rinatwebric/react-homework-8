@@ -9,7 +9,7 @@
 - [x] Роутер: `/`, `/scan`, `/map` (lazy), `/water`, `/admin` (lazy, вне мобильной оболочки), 404; error boundary; i18n (ru) с первым экраном
 - [x] `vite-plugin-pwa` (injectManifest, `src/sw.ts`), manifest, иконки
 - [x] Supabase: `supabase init`, первая миграция (таблицы, RLS, view, бакет), `.env.example`
-- [ ] Деплой на Vercel, переменные окружения — инструкция готова: `docs/deploy.md` (подключение GitHub в дашборде). **На 2026-10-23 Vercel к репозиторию не подключён**, HTTPS-ссылки на демо пока нет
+- [x] Деплой на Vercel, переменные окружения — репозиторий подключён к Vercel владельцем (автодеплой из `main`), переменные окружения заданы. Ссылку на прод даёт дашборд Vercel; инструкция и проверка PWA — `docs/deploy.md`
 - **Контрольная точка:** пустое приложение открывается по HTTPS-ссылке и ставится на телефон
 
 ## Срез 1 — AI-сканер (P0) · `suutech-ai-scanner`
@@ -18,9 +18,12 @@
 - [x] Экран результата (риск цветом+иконкой+текстом, confidence, дисклеймер)
 - [ ] Прогон 10–15 реальных фото → `docs/ai-test-photos.md`, выбрать 3–4 демо-фото
 - **Контрольная точка:** с телефона фото → оценка за несколько секунд
-- Статус 2026-10-23: код и локальные проверки готовы (`typecheck`, `lint`, `test`, `build`, `verify:sql` — зелёные),
-  но **не задеплоено**: нет `VISION_API_KEY`/`VISION_MODEL` в секретах и доступа к дашборду Supabase.
-  Порядок деплоя — `docs/deploy.md` §«AI-сканер»; прогон фото и контрольная точка — после деплоя.
+- Проект Supabase: `ljwyrvyzvuxauylmtosp` (`https://ljwyrvyzvuxauylmtosp.supabase.co`). На 2026-10-23 проект живой
+  (REST отвечает), функции `analyze-photo` ещё нет (404), `supabase link` не выполнен.
+- **Блокер деплоя:** локальный Supabase CLI авторизован под другим аккаунтом (`tanir-rico`), а `db push` требует пароль БД.
+  Нужно: `npx supabase login` под аккаунтом владельца → `npx supabase link --project-ref ljwyrvyzvuxauylmtosp` →
+  `db push` → `secrets set VISION_API_KEY=... VISION_MODEL=...` → `functions deploy analyze-photo` (`docs/deploy.md` §5).
+- Протокол прогона 10–15 фото готов в `docs/ai-test-photos.md` — заполняется после деплоя.
 
 ## Срез 2 — геопозиция, отчёт, карта (P0) · `suutech-map-geo`, `suutech-backend`
 - [ ] Форма отчёта: «Есть ли вода в подвале?» (да/нет) и «Глубина воды в колодце, м» (необязательно)
