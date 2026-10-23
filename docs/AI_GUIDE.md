@@ -1,20 +1,20 @@
-# Как работать с AI-агентом над HydroGuard KG
+# Как работать с AI-агентом над SuuTech
 
 Короткая инструкция для команды SuuTech: что уже настроено, что говорить агенту, как не потерять время.
 
 ## 0. Как начать (с нуля, 15 минут)
 1. **Получи проект через git, а не копированием папок.** Скрытые папки (`.agents`, `.claude`, `.cursor`) при
    копировании через Проводник/Finder часто теряются, и агент не видит скиллы:
-   `git clone https://github.com/rinatwebric/react-homework-8.git hydroguard-kg && cd hydroguard-kg && npm install`
-2. Проверь, что в корне есть: `AGENTS.md`, `CLAUDE.md`, `docs/`, `.agents/skills/` (20 папок), `.claude/skills/`,
-   `.mcp.json`. Проверка: `npx skills ls` — должно быть 20 скиллов.
-3. Открой **корень проекта** в агенте: Claude Code — `cd hydroguard-kg && claude`; Cursor / Windsurf — File → Open Folder;
+   `git clone https://github.com/rinatwebric/react-homework-8.git suutech-kg && cd suutech-kg && npm install`
+2. Проверь, что в корне есть: `AGENTS.md`, `CLAUDE.md`, `docs/`, `.agents/skills/` (21 папка), `.claude/skills/`,
+   `.mcp.json`. Проверка: `npx skills ls` — должно быть 21 скилл.
+3. Открой **корень проекта** в агенте: Claude Code — `cd suutech-kg && claude`; Cursor / Windsurf — File → Open Folder;
    Codex — `codex` в корне. Агент сам прочитает `AGENTS.md` и увидит скиллы.
 4. Проверь, что агент «понял» проект — первый промпт:
    ```
    Прочитай AGENTS.md и docs/plan.md. Кратко: что за проект, какие у тебя есть скиллы и какой срез делаем первым?
    ```
-   Если он не называет скиллы `hydroguard-*` — ты открыл не ту папку или скрытые папки не скопировались.
+   Если он не называет скиллы `suutech-*` — ты открыл не ту папку или скрытые папки не скопировались.
 5. Дальше — раздел 4: «Старт среза» со срезом 0. Новый срез = новый чат.
 
 ## 1. Что настроено в репозитории
@@ -25,15 +25,15 @@
 | `docs/spec.md` | Полное ТЗ в markdown — агент читает нужные разделы |
 | `docs/plan.md` | Срезы с чекбоксами, агент отмечает прогресс |
 | `docs/decisions.md` | Журнал спорных решений |
-| `.agents/skills/`, `.claude/skills/` | Скиллы: 7 проектных `hydroguard-*` + 13 внешних (Supabase, Vercel, Anthropic, дизайн) |
-| `.claude/agents/` | Субагенты `hydroguard-reviewer` и `hydroguard-debugger` |
+| `.agents/skills/`, `.claude/skills/` | Скиллы: 8 проектных `suutech-*` + 13 внешних (Supabase, Vercel, Anthropic, дизайн) |
+| `.claude/agents/` | Субагенты `suutech-reviewer` и `suutech-debugger` |
 | `.claude/commands/` | Команды `/slice`, `/review`, `/bug`, `/freeze-check` |
 | `.mcp.json`, `.cursor/mcp.json` | MCP: Context7 (документация), Playwright (браузер), Supabase (только чтение) |
 | `.claude/settings.json` | Запрет агенту читать `.env` и делать `supabase db push` |
 | `skills-lock.json` | Версии внешних скиллов (`npx skills update -p` — обновить) |
 
 Скиллы подключаются **автоматически**: агент видит их описания и загружает нужный, когда задача подходит.
-Можно и явно: «используй скилл hydroguard-ai-scanner».
+Можно и явно: «используй скилл suutech-ai-scanner».
 
 ## 2. Первичная настройка (один раз, 10 минут)
 1. Supabase MCP: в `.mcp.json` и `.cursor/mcp.json` допиши в URL `&project_ref=<ref твоего проекта>`
@@ -85,17 +85,24 @@
 ```
 (В Claude Code: `/bug <описание>`.)
 
+### Датчики и симулятор (срез 3)
+```
+Скилл suutech-sensors (+ suutech-backend). Сделай таблицы датчиков, ingest-sensor, compute-zone-risk и
+scripts/simulate-sensors.ts с режимами normal / rise / reset. Сначала план и правила риска с порогами из конфига.
+Проверка: npm run simulate -- --mode rise → зона на карте переходит в «высокий», появляется запись в alerts.
+```
+
 ### Настройка AI-промпта на фото
 ```
-Скилл hydroguard-ai-scanner. Вот результаты на 12 фото: <таблица фото → risk → confidence → правильно ли>.
+Скилл suutech-ai-scanner. Вот результаты на 12 фото: <таблица фото → risk → confidence → правильно ли>.
 Найди закономерность ошибок и предложи правку системного промпта. Не меняй контракт JSON.
 ```
 
 ### Дизайн-система (один раз, в срезе 0)
 ```
 Используй скиллы ui-ux-pro-max и tailwind-design-system.
-Запусти: python3 .agents/skills/ui-ux-pro-max/scripts/search.py "civic flood risk alert map mobile pwa rural" --design-system -p "HydroGuard KG"
-Возьми из результата стиль, шрифты и UX-правила, но учти AGENTS.md: красный/жёлтый/зелёный только для уровней риска,
+Запусти: python3 .agents/skills/ui-ux-pro-max/scripts/search.py "civic flood risk alert map mobile pwa rural" --design-system -p "SuuTech"
+Возьми из результата стиль, шрифты и UX-правила, но учти AGENTS.md: зелёный/жёлтый/оранжевый/красный только для уровней риска,
 бренд-цвет другой. Оформи токены в @theme в src/index.css, базовые компоненты (Button, Banner, RiskBadge, Card,
 состояния Loading/Error/Empty) в src/shared/ui. Покажи палитру и компоненты на странице /dev/ui.
 ```
@@ -121,7 +128,7 @@
 
 ### Готовность к демо
 ```
-/freeze-check   (или: «Загрузи скилл hydroguard-demo-readiness и пройди чек-лист приёмки»)
+/freeze-check   (или: «Загрузи скилл suutech-demo-readiness и пройди чек-лист приёмки»)
 ```
 
 ### Слайды
@@ -131,10 +138,11 @@
 ```
 
 ## 5. Кто что просит у агента
-- **Ринат (backend):** срезы 0 (Supabase), 1 (`analyze-photo`, промпт), 3–4 (погода, офлайн-синк, push).
-  Скиллы: `hydroguard-backend`, `supabase`, `supabase-postgres-best-practices`, `hydroguard-ai-scanner`, `hydroguard-weather`, `hydroguard-web-push`.
+- **Ринат (backend):** срезы 0 (Supabase), 1 (`analyze-photo`, промпт), 3–4 (погода, датчики и симулятор, офлайн-синк, push).
+  Скилл `suutech-sensors` тоже твой.
+  Скиллы: `suutech-backend`, `supabase`, `supabase-postgres-best-practices`, `suutech-ai-scanner`, `suutech-weather`, `suutech-web-push`.
 - **Анархан (frontend):** экраны, карта, PWA-оболочка, i18n.
-  Скиллы: `hydroguard-map-geo`, `hydroguard-offline-pwa`, `ui-ux-pro-max`, `tailwind-design-system`, `frontend-design`, `web-design-guidelines`, `vercel-react-best-practices`.
+  Скиллы: `suutech-map-geo`, `suutech-offline-pwa`, `ui-ux-pro-max`, `tailwind-design-system`, `frontend-design`, `web-design-guidelines`, `vercel-react-best-practices`.
 - **Мелике:** тексты рекомендаций, тестовые фото, проверка кыргызского (`TODO-ky`), слайды через `pptx`.
 - Работаете параллельно → разные ветки (`feat/scanner`, `feat/map`), PR в `main`, ревью перед мержем.
 
