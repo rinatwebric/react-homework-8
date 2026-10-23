@@ -29,6 +29,22 @@ export const MAP_ZONES = {
 /** Сколько меток отчётов тянем на публичную карту (демо-масштаб, без пагинации). */
 export const MAP_REPORTS_LIMIT = 500
 
+/**
+ * Стартовый вид: вся страна. `maxZoom` намеренно меньше тайлового: на 15+ видны
+ * кварталы, а публичные координаты округлены до ~100 м — детальнее смысла нет.
+ */
+export const MAP_VIEW: {
+  center: [number, number]
+  zoom: number
+  minZoom: number
+  maxZoom: number
+} = {
+  center: [41.2, 74.6],
+  zoom: 7,
+  minZoom: 5,
+  maxZoom: 14,
+}
+
 /** Hex-копии токенов --color-risk-*-fill: заливка зон и цвет метки. */
 export const RISK_FILL_HEX: Record<RiskLevel, string> = {
   normal: '#8fd6e6',

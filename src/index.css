@@ -88,3 +88,19 @@
     }
   }
 }
+
+/*
+ * Кластер меток на карте: «чернильный» круг с числом. Цвет кластера намеренно вне
+ * шкалы риска — кластер означает «сколько отчётов», а не уровень опасности.
+ * Класс из report-icon.ts (inline-HTML Leaflet не видит Tailwind-классы).
+ */
+.suutech-cluster {
+  display: grid;
+  place-items: center;
+  border-radius: 9999px;
+  background: var(--color-ink);
+  color: var(--color-on-ink);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  box-shadow: 0 1px 8px rgb(18 58 92 / 0.35);
+}
