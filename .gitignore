@@ -37,3 +37,9 @@ supabase/.branches
 
 # Python cache (ui-ux-pro-max scripts)
 __pycache__/
+
+# PWA: dev service worker (vite-plugin-pwa devOptions)
+dev-dist
+
+# Vercel CLI (деплой — через дашборд, см. docs/deploy.md)
+.vercel
