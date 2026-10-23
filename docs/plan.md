@@ -69,6 +69,13 @@
 - [x] Миграция `20261024180000_zone_risk` применена на прод 2026-10-24 (Management API `/database/query` +
   запись в `supabase_migrations.schema_migrations`); проверено на проде: RLS включён, политика одна,
   `anon`/`authenticated` имеют только `select`, `insert/update/delete` запрещены
+- [x] Карта не схлопывается в 0×0 (фикс PR #22, squash `1275c87`, 2026-10-24): Leaflet мерил контейнер до
+  того, как flex-раскладка дала высоту (`svg height="0"`, `path d="M0 0"` — пустой бокс на проде).
+  Теперь контейнер `absolute inset-0`, `MapSizeWatcher` вызывает `invalidateSize` + `ResizeObserver`;
+  стартовый вид по bbox страны (`MAP_VIEW.bounds`), а не `center`+`zoom 7` — Кыргызстан влезает целиком
+  на 390 px; зоны получили заливку 0.32/0.42 и пунктир 1.5 px (при 0.18 и 1 px их не было видно на OSM).
+  Проверено скриншотами headless Edge на проде: страна целиком, пунктирные границы областей,
+  «Отчётов пока нет» — карта работает без данных.
 - **Контрольная точка:** фото → метка на карте с телефона (ждёт проверки человеком)
 
 ## Срез 3 — погода, датчики, /admin, офлайн (P1) · `suutech-weather`, `suutech-sensors`, `suutech-backend`, `suutech-offline-pwa`
