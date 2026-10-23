@@ -19,6 +19,7 @@
 - [x] Камера/галерея, сжатие ≤1 МБ / 1280 px, удаление EXIF (`preserveExif: false`)
 - [x] Edge Function `analyze-photo` + контракт zod + повтор + понятные ошибки
 - [x] Экран результата (риск цветом+иконкой+текстом, confidence, дисклеймер)
+- [x] Прод-смоук `analyze-photo` (23.10.2026, модель `gemini-3.5-flash-lite`): фото → 200 за 14 с + `assessment` + дисклеймер; повтор того же файла → `cached: true` за 1,4 с; `client_id` не UUID → 400 `INVALID_INPUT`; файл > 2 МБ → 413 `FILE_TOO_LARGE`
 - [ ] Прогон 10–15 реальных фото → `docs/ai-test-photos.md`, выбрать 3–4 демо-фото
 - **Контрольная точка:** с телефона фото → оценка за несколько секунд
 - Проект Supabase: `ljwyrvyzvuxauylmtosp` (`https://ljwyrvyzvuxauylmtosp.supabase.co`). На 2026-10-23 проект живой
