@@ -179,6 +179,20 @@ curl -s \
    Резерв задаётся `VISION_MODEL_FALLBACK` (по умолчанию `gemini-3.5-flash`): при 404/5xx от
    основной модели функция сама повторяет запрос на резервной, ошибку житель не видит.
 
+   **Если CLI отвечает 403** `Your account does not have the necessary privileges to access this endpoint`
+   — это не про права внутри проекта, а про **другой аккаунт в CLI**:
+
+   ```bash
+   npx supabase projects list                       # видно ли ljwyrvyzvuxauylmtosp?
+   Get-Content supabase/.temp/linked-project.json   # кто владелец проекта (organization_id)
+   ```
+
+   Секреты и деплой требуют роли Owner/Admin. Аккаунт сменяется входом в браузере
+   (`npx supabase login`) или personal access token
+   (<https://supabase.com/dashboard/account/tokens> → `$env:SUPABASE_ACCESS_TOKEN='sbp_…'`).
+   Альтернатива без CLI — **Dashboard → Project Settings → Edge Functions → Secrets** (значения
+   видны только на запись, прочитать их потом нельзя).
+
 3. Деплой функции:
 
    ```bash
@@ -218,6 +232,7 @@ curl -s \
 | Билд падает на `tsc -b` | ошибка типов | локально `npm run build` и починить до пуша |
 | Сканер: 503 `NOT_CONFIGURED` | не задан `VISION_API_KEY` (или пустой `VISION_MODEL`) | `npx supabase secrets set ...` и повторный вызов; секреты применяются без редеплоя |
 | Сканер: 502 `SERVER` + «Модель отклонила запрос (401)» | ключ не от Gemini, ограничен по API или скопирован с пробелом/кавычками | проверить ключ напрямую: `curl -s -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent" -H "x-goog-api-key: <ключ>" -H "Content-Type: application/json" -d '{"contents":[{"parts":[{"text":"ping"}]}]}'` → должен вернуть `candidates`; иначе выпустить новый в <https://aistudio.google.com/apikey> и повторить `secrets set` |
+| `secrets set` / `functions deploy`: 403 «does not have the necessary privileges» | CLI залогинен под другим аккаунтом (`projects list` не показывает проект) | `npx supabase login` под владельцем проекта, `link --project-ref <ref>`, либо задать секреты в Dashboard → Edge Functions → Secrets |
 | Сканер: 502 + «Модель недоступна (404)» в логах | модель снята с обслуживания или закрыта для новых ключей (`gemini-2.5-flash`) | поставить `VISION_MODEL=gemini-3.5-flash-lite`; резерв `VISION_MODEL_FALLBACK` подхватится сам |
 | Сканер: 502 + «Модель недоступна (503)» | «high demand» у провайдера | функция сама повторит на `VISION_MODEL_FALLBACK`; если и он 503 — подождать минуту |
 | Сканер: 403 «Method doesn't allow unregistered callers» | ключ вообще не дошёл до запроса (пустая переменная, лишние кавычки в значении, забыт заголовок) | сверить длину: `$k.Length` (ключ Gemini: `AIza…` ≈ 39 символов или `AQ.…` ≈ 53); для проверки удобнее query-параметр: `...:generateContent?key=$k` |
