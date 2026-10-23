@@ -1,17 +1,20 @@
-import { Camera, History, ListChecks, MapPin } from 'lucide-react'
+import { Camera, History, ListChecks, Send } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import type { Assessment } from '../../../shared/types/ai-contract'
+import type { ReportContext } from '../../../shared/types/report-context'
+import { photoPathClientId } from '../../../shared/types/report-contract'
 import { Banner } from '../../../shared/ui/Banner'
 import { Button, ButtonLink } from '../../../shared/ui/Button'
 import { Card } from '../../../shared/ui/Card'
 import { RiskBadge } from '../../../shared/ui/RiskBadge'
 import { RiskScale } from '../../../shared/ui/RiskScale'
+import type { AnalyzeResult } from '../lib/analyze-photo'
 import { buildAssessmentView } from '../lib/assessment-view'
 import { ConfidenceMeter } from './ConfidenceMeter'
 
 type AssessmentResultProps = {
-  assessment: Assessment
-  cached: boolean
+  result: AnalyzeResult
+  /** Тот же client_id, с которым фото ушло в analyze-photo: путь фото проверяется на сервере. */
+  clientId: string
   onRescan: () => void
 }
 
@@ -19,10 +22,26 @@ type AssessmentResultProps = {
  * Результат AI-оценки: риск цветом + иконкой + текстом, уверенность,
  * находки, действия и дисклеймер. Нерелевантное фото и низкая уверенность
  * показываются отдельными подсказками, а не «приговором».
+ *
+ * Главное действие — «Сообщить о воде»: оценка переезжает в отчёт вместе с фото
+ * и координатами (срез 2). Оценка сама по себе ничего не отправляет властям.
  */
-export function AssessmentResult({ assessment, cached, onRescan }: AssessmentResultProps) {
+export function AssessmentResult({ result, clientId, onRescan }: AssessmentResultProps) {
   const { t } = useTranslation()
+  const { assessment, cached, photoPath } = result
   const view = buildAssessmentView(assessment)
+
+  // Фото прикладываем, только если оно лежит в папке этого скана:
+  // подменённый или чужой путь в отчёт не уедет.
+  const ownPhotoPath = photoPath && photoPathClientId(photoPath) === clientId ? photoPath : null
+
+  const reportState: ReportContext = {
+    photoPath: ownPhotoPath,
+    riskLevel: assessment.risk_level,
+    confidence: assessment.confidence,
+    findings: assessment.findings,
+    recommendations: assessment.recommendations,
+  }
 
   return (
     <div className="space-y-3">
@@ -92,9 +111,9 @@ export function AssessmentResult({ assessment, cached, onRescan }: AssessmentRes
       <Banner tone="info">{assessment.disclaimer}</Banner>
 
       <div className="flex gap-3">
-        <ButtonLink to="/map" className="flex-1">
-          <MapPin aria-hidden className="size-5" strokeWidth={2.25} />
-          {t('scan.ctaMap')}
+        <ButtonLink to="/report" state={reportState} className="flex-1">
+          <Send aria-hidden className="size-5" strokeWidth={2.25} />
+          {t('scan.ctaReport')}
         </ButtonLink>
         <Button
           variant="outline"
@@ -106,6 +125,9 @@ export function AssessmentResult({ assessment, cached, onRescan }: AssessmentRes
           <Camera aria-hidden className="size-6" strokeWidth={2} />
         </Button>
       </div>
+      <p className="text-center text-xs leading-snug text-muted-foreground">
+        {t('scan.reportHint')}
+      </p>
     </div>
   )
 }

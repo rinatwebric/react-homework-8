@@ -51,6 +51,8 @@ export type ButtonLinkProps = {
   className?: string
   /** Подпись, если внутри только иконка. */
   ariaLabel?: string
+  /** Контекст перехода (react-router): например, результат сканера для формы отчёта. */
+  state?: unknown
 }
 
 export function ButtonLink({
@@ -60,9 +62,10 @@ export function ButtonLink({
   size = 'lg',
   className,
   ariaLabel,
+  state,
 }: ButtonLinkProps) {
   return (
-    <Link to={to} aria-label={ariaLabel} className={buttonClasses(variant, size, className)}>
+    <Link to={to} state={state} aria-label={ariaLabel} className={buttonClasses(variant, size, className)}>
       {children}
     </Link>
   )

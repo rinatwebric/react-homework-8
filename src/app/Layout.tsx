@@ -32,14 +32,14 @@ export function Layout() {
             key={to}
             to={to}
             end={end}
-            className={({ isActive }) =>
+            className={({ isActive }: { isActive: boolean }) =>
               cx(
                 'flex min-h-16 flex-1 flex-col items-center justify-center gap-1 rounded-xl text-xs font-medium transition-colors',
                 isActive ? 'text-brand' : 'text-muted-foreground hover:text-brand',
               )
             }
           >
-            {({ isActive }) => (
+            {({ isActive }: { isActive: boolean }) => (
               <>
                 <Icon aria-hidden className="size-6" strokeWidth={isActive ? 2.5 : 1.9} />
                 {t(labelKey)}

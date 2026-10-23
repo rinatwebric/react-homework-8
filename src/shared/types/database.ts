@@ -37,6 +37,7 @@ export type ReportRow = {
   status: ReportStatus
   moderator_note: string | null
   device_hash: string | null
+  ip_hash: string | null
   photo_sha256: string | null
   is_demo: boolean
   lat_public: number | null

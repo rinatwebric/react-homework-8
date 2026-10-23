@@ -15,7 +15,7 @@ const TILES = [
   { to: '/scan', icon: ScanLine, titleKey: 'home.tiles.scanTitle', textKey: 'home.tiles.scanText' },
   { to: '/map', icon: MapPin, titleKey: 'home.tiles.mapTitle', textKey: 'home.tiles.mapText' },
   { to: '/water', icon: Droplet, titleKey: 'home.tiles.waterTitle', textKey: 'home.tiles.waterText' },
-  { to: '/scan', icon: Plus, titleKey: 'home.tiles.reportTitle', textKey: 'home.tiles.reportText' },
+  { to: '/report', icon: Plus, titleKey: 'home.tiles.reportTitle', textKey: 'home.tiles.reportText' },
 ] as const
 
 /** Главная: село, риск на сегодня, плитки разделов и совет (макет 1). */
