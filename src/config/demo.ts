@@ -11,12 +11,6 @@ export const DEMO_HOME: { level: RiskLevel } = {
   level: 'elevated',
 }
 
-/** Ответ AI-сканера: в срезе 1 придёт из analyze-photo. */
-export const DEMO_REPORT: { level: RiskLevel; steps: readonly string[] } = {
-  level: 'elevated',
-  steps: ['scan.steps.dry', 'scan.steps.drain', 'scan.steps.repeat'],
-}
-
 /** Легенда карты: те же уровни, что в риск-шкале проекта. */
 export const DEMO_MAP: {
   sheetLevel: RiskLevel

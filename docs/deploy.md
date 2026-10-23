@@ -44,6 +44,18 @@ git push -u origin main
    только в секретах Edge Functions: `npx supabase secrets set ...`.
 5. **Deploy**. Первый билд ~1–2 мин. Получим `https://<project>.vercel.app`.
 
+Прод SuuTech: <https://suutech.vercel.app> (публичный). Preview-URL вида
+`suutech-git-<branch>-<team>.vercel.app` закрыт Vercel Authentication (302 на SSO) — для показа
+жюри и проверки с телефона брать прод-домен (или отключить Deployment Protection для preview).
+
+Проверка, что переменные реально попали в собранный бандл (после Redeploy):
+
+```bash
+curl -s https://suutech.vercel.app/assets/index-*.js | grep -c ljwyrvyzvuxauylmtosp
+```
+
+`0` → `VITE_SUPABASE_*` не заданы для Production (или не было передеплоя).
+
 ### 1.3 Автодеплой
 
 - Пуш в `main` → production-деплой; пул-реквест → preview-URL.
@@ -56,6 +68,14 @@ git push -u origin main
 - HTTPS и домен `*.vercel.app` — автоматически. **PWA ставится только по HTTPS**
   (по локальному `http://192.168.x.x:5173` install-промпта не будет — это не secure context).
 
+### 1.4 Частая ошибка сборки на Vercel: платформенный бинарь в `devDependencies`
+
+`npm ci` на Linux падает, если в `devDependencies` лежит пакет только для Windows
+(например, `@rolldown/binding-win32-x64-msvc`): `EBADPLATFORM … wanted {os:"win32"}`.
+Такой пакет не добавляем руками — нужные бинарники приходят через `optionalDependencies`
+(`lightningcss`, `rolldown`). Если локально на Windows падает `require('lightningcss')`,
+лечим переустановкой (`npm install --prefer-online`), а не правкой `package.json`.
+
 ## 2. Backend (Supabase) — миграция
 
 Docker в рабочей среде нет, поэтому локальный стек не поднимаем (проверка SQL —
@@ -66,6 +86,11 @@ npx supabase login                       # интерактивно, один р
 npx supabase link --project-ref <ref>    # ref из URL проекта в дашборде
 npx supabase db push                     # применит supabase/migrations/*.sql
 ```
+
+Проект SuuTech: `ljwyrvyzvuxauylmtosp` → `https://ljwyrvyzvuxauylmtosp.supabase.co`
+(дашборд: <https://supabase.com/dashboard/project/ljwyrvyzvuxauylmtosp>).
+`login` нужен под тем аккаунтом, у которого есть доступ к этому проекту: чужой аккаунт в CLI
+даёт `Cannot find project ref` и пустой список проектов.
 
 После пуша — перегенерировать типы и заменить файл, написанный руками:
 
@@ -121,7 +146,53 @@ curl -s \
 
 Проверить бакет: **Storage** → есть `report-photos`, лимит файла 2 MB, MIME только изображения.
 
-## 5. Откат / типовые проблемы
+## 5. AI-сканер (срез 1)
+
+1. Миграция кэша оценок идёт вместе с остальными: `npx supabase db push`
+   (создаёт `photo_assessments`; RLS включён, политик нет — таблицу читает/пишет только функция).
+
+2. Секреты функции — **только в Supabase**, Vercel их не видит:
+
+   ```bash
+   npx supabase secrets set VISION_API_KEY=<ключ Google AI Studio> VISION_MODEL=gemini-2.5-flash
+   ```
+
+   ⚠️ Ключ нельзя хранить в переменных Vercel: с префиксом `VITE_` Vite вшивает его в публичный
+   JS-бандл (ключ увидит любой, кто откроет DevTools), без префикса клиент его не читает, а Edge
+   Function всё равно получает только секреты Supabase. Если ключ уже добавлен в Vercel —
+   удалить переменную и **перевыпустить ключ** у провайдера модели.
+
+   `VISION_MODEL` можно не задавать — функция возьмёт `gemini-2.5-flash` по умолчанию
+   (`supabase/functions/_shared/vision.ts`). Провайдер — Gemini, ключ из
+   <https://aistudio.google.com/apikey>. Ключ без модели = 503 `NOT_CONFIGURED`.
+
+3. Деплой функции:
+
+   ```bash
+   npx supabase functions deploy analyze-photo
+   ```
+
+   `verify_jwt` оставляем включённым (по умолчанию): клиент шлёт anon-ключ в `Authorization`.
+
+4. Smoke-тест (подставьте свой файл и ключи):
+
+   ```bash
+   curl -s -X POST "https://<ref>.supabase.co/functions/v1/analyze-photo" \
+     -H "apikey: <anon-key>" -H "Authorization: Bearer <anon-key>" \
+     -F "file=@photo.jpg" -F "client_id=smoke-1" -F "lang=ru" -F "mode=resident"
+   # 200 → { "assessment": {...}, "cached": false, "contract_version": 1, "photo_path": "..." }
+   # повторить тот же файл → "cached": true (ответ из кэша по SHA-256)
+   ```
+
+5. Ожидаемые ошибки: нет файла → 400 `INVALID_INPUT`; >2 МБ → 413 `FILE_TOO_LARGE`;
+   GIF/HEIC → 415 `UNSUPPORTED_MEDIA`; 13-й запрос за час с одним `client_id` → 429 `RATE_LIMITED`;
+   модель вернула мусор дважды → 502 `AI_INVALID`; модель молчит 25 с → 504 `AI_TIMEOUT`.
+
+6. Проверка на телефоне: камера и галерея → результат за несколько секунд; фото кота → баннер
+   «не дом и не участок»; тёмное фото → «низкая уверенность»; то же фото повторно → метка «Из кэша»;
+   авиарежим → «Нет связи» без белого экрана; DevTools → в бандле нет `VISION_API_KEY`.
+
+## 6. Откат / типовые проблемы
 
 | Симптом | Причина | Что делать |
 |---|---|---|
@@ -129,3 +200,5 @@ curl -s \
 | После деплоя старая версия | SW кэширует | `/sw.js` должен отдаваться с `must-revalidate`; закрыть вкладку/переустановить PWA |
 | Нет кнопки «Установить» | открыто по HTTP или уже установлено | только HTTPS; Chrome показывает баннер не всегда — меню «Установить приложение» |
 | Билд падает на `tsc -b` | ошибка типов | локально `npm run build` и починить до пуша |
+| Сканер: 503 `NOT_CONFIGURED` | не задан `VISION_API_KEY` (или пустой `VISION_MODEL`) | `npx supabase secrets set ...` и повторный вызов; секреты применяются без редеплоя |
+| Сканер: 401/403 на `analyze-photo` | в клиенте неверный `VITE_SUPABASE_ANON_KEY` или функция задеплоена с `verify_jwt` и без заголовка | сверить ключ в переменных Vercel и заголовки `apikey`/`Authorization` |

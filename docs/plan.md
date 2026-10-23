@@ -9,15 +9,24 @@
 - [x] Роутер: `/`, `/scan`, `/map` (lazy), `/water`, `/admin` (lazy, вне мобильной оболочки), 404; error boundary; i18n (ru) с первым экраном
 - [x] `vite-plugin-pwa` (injectManifest, `src/sw.ts`), manifest, иконки
 - [x] Supabase: `supabase init`, первая миграция (таблицы, RLS, view, бакет), `.env.example`
-- [ ] Деплой на Vercel, переменные окружения — инструкция готова: `docs/deploy.md` (подключение GitHub в дашборде)
+- [x] Деплой на Vercel, переменные окружения — репозиторий подключён к Vercel владельцем (автодеплой из `main`), прод: <https://suutech.vercel.app> (публичный, без SSO).
+  Preview-деплои закрыты Vercel Authentication. ⚠️ На 2026-10-23 в прод-бандле **нет** `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` —
+  переменные надо задать в дашборде (Production + Preview) и передеплоить, иначе сканер честно скажет «сервис не настроен».
+  Инструкция и проверка PWA — `docs/deploy.md`
 - **Контрольная точка:** пустое приложение открывается по HTTPS-ссылке и ставится на телефон
 
 ## Срез 1 — AI-сканер (P0) · `suutech-ai-scanner`
-- [ ] Камера/галерея, сжатие ≤1 МБ / 1280 px, удаление EXIF
-- [ ] Edge Function `analyze-photo` + контракт zod + повтор + понятные ошибки
-- [ ] Экран результата (риск цветом+иконкой+текстом, confidence, дисклеймер)
+- [x] Камера/галерея, сжатие ≤1 МБ / 1280 px, удаление EXIF (`preserveExif: false`)
+- [x] Edge Function `analyze-photo` + контракт zod + повтор + понятные ошибки
+- [x] Экран результата (риск цветом+иконкой+текстом, confidence, дисклеймер)
 - [ ] Прогон 10–15 реальных фото → `docs/ai-test-photos.md`, выбрать 3–4 демо-фото
 - **Контрольная точка:** с телефона фото → оценка за несколько секунд
+- Проект Supabase: `ljwyrvyzvuxauylmtosp` (`https://ljwyrvyzvuxauylmtosp.supabase.co`). На 2026-10-23 проект живой
+  (REST отвечает), функции `analyze-photo` ещё нет (404), `supabase link` не выполнен.
+- **Блокер деплоя:** локальный Supabase CLI авторизован под другим аккаунтом (`tanir-rico`), а `db push` требует пароль БД.
+  Нужно: `npx supabase login` под аккаунтом владельца → `npx supabase link --project-ref ljwyrvyzvuxauylmtosp` →
+  `db push` → `secrets set VISION_API_KEY=... VISION_MODEL=...` → `functions deploy analyze-photo` (`docs/deploy.md` §5).
+- Протокол прогона 10–15 фото готов в `docs/ai-test-photos.md` — заполняется после деплоя.
 
 ## Срез 2 — геопозиция, отчёт, карта (P0) · `suutech-map-geo`, `suutech-backend`
 - [ ] Форма отчёта: «Есть ли вода в подвале?» (да/нет) и «Глубина воды в колодце, м» (необязательно)
