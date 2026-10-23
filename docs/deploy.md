@@ -154,7 +154,7 @@ curl -s \
 2. Секреты функции — **только в Supabase**, Vercel их не видит:
 
    ```bash
-   npx supabase secrets set VISION_API_KEY=<ключ Google AI Studio> VISION_MODEL=gemini-2.5-flash
+   npx supabase secrets set VISION_API_KEY=<ключ Google AI Studio> VISION_MODEL=gemini-3.5-flash-lite
    ```
 
    ⚠️ Ключ нельзя хранить в переменных Vercel: с префиксом `VITE_` Vite вшивает его в публичный
@@ -162,9 +162,22 @@ curl -s \
    Function всё равно получает только секреты Supabase. Если ключ уже добавлен в Vercel —
    удалить переменную и **перевыпустить ключ** у провайдера модели.
 
-   `VISION_MODEL` можно не задавать — функция возьмёт `gemini-2.5-flash` по умолчанию
+   `VISION_MODEL` можно не задавать — функция возьмёт `gemini-3.5-flash-lite` по умолчанию
    (`supabase/functions/_shared/vision.ts`). Провайдер — Gemini, ключ из
-   <https://aistudio.google.com/apikey>. Ключ без модели = 503 `NOT_CONFIGURED`.
+   <https://aistudio.google.com/apikey> (новые ключи имеют вид `AQ.…`, старые — `AIza…`; оба
+   передаются заголовком `x-goog-api-key`). Ключ без модели = 503 `NOT_CONFIGURED`.
+
+   Выбор модели проверен на живом ключе (окт. 2026):
+
+   | Модель | Ответ на фото |
+   |---|---|
+   | `gemini-3.5-flash-lite` | 200 за 1–3 с, JSON по схеме — **дефолт** |
+   | `gemini-3.5-flash` | часто 503 «high demand» — используется как резерв |
+   | `gemini-3.8-flash` | не отвечает за 25 с (thinking) |
+   | `gemini-2.5-flash` | 404 «no longer available to new users» |
+
+   Резерв задаётся `VISION_MODEL_FALLBACK` (по умолчанию `gemini-3.5-flash`): при 404/5xx от
+   основной модели функция сама повторяет запрос на резервной, ошибку житель не видит.
 
 3. Деплой функции:
 
@@ -204,7 +217,9 @@ curl -s \
 | Нет кнопки «Установить» | открыто по HTTP или уже установлено | только HTTPS; Chrome показывает баннер не всегда — меню «Установить приложение» |
 | Билд падает на `tsc -b` | ошибка типов | локально `npm run build` и починить до пуша |
 | Сканер: 503 `NOT_CONFIGURED` | не задан `VISION_API_KEY` (или пустой `VISION_MODEL`) | `npx supabase secrets set ...` и повторный вызов; секреты применяются без редеплоя |
-| Сканер: 502 `SERVER` + «Модель отклонила запрос (401)» | ключ не от Gemini (ключи Gemini начинаются с `AIza`), ограничен по API или скопирован с пробелом/кавычками | проверить ключ напрямую: `curl -s -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent" -H "x-goog-api-key: <ключ>" -H "Content-Type: application/json" -d '{"contents":[{"parts":[{"text":"ping"}]}]}'` → должен вернуть `candidates`; иначе выпустить новый в <https://aistudio.google.com/apikey> и повторить `secrets set` |
-| Сканер: 403 «Method doesn't allow unregistered callers» | ключ вообще не дошёл до запроса (пустая переменная, лишние кавычки в значении, забыт заголовок) | сверить длину: `$k.Length` (ключ Gemini ≈ 39 символов, начинается на `AIza`); для проверки удобнее query-параметр: `...:generateContent?key=$k` |
+| Сканер: 502 `SERVER` + «Модель отклонила запрос (401)» | ключ не от Gemini, ограничен по API или скопирован с пробелом/кавычками | проверить ключ напрямую: `curl -s -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent" -H "x-goog-api-key: <ключ>" -H "Content-Type: application/json" -d '{"contents":[{"parts":[{"text":"ping"}]}]}'` → должен вернуть `candidates`; иначе выпустить новый в <https://aistudio.google.com/apikey> и повторить `secrets set` |
+| Сканер: 502 + «Модель недоступна (404)» в логах | модель снята с обслуживания или закрыта для новых ключей (`gemini-2.5-flash`) | поставить `VISION_MODEL=gemini-3.5-flash-lite`; резерв `VISION_MODEL_FALLBACK` подхватится сам |
+| Сканер: 502 + «Модель недоступна (503)» | «high demand» у провайдера | функция сама повторит на `VISION_MODEL_FALLBACK`; если и он 503 — подождать минуту |
+| Сканер: 403 «Method doesn't allow unregistered callers» | ключ вообще не дошёл до запроса (пустая переменная, лишние кавычки в значении, забыт заголовок) | сверить длину: `$k.Length` (ключ Gemini: `AIza…` ≈ 39 символов или `AQ.…` ≈ 53); для проверки удобнее query-параметр: `...:generateContent?key=$k` |
 | Сканер: 400 `client_id должен быть UUID` | смоук-запрос с произвольной строкой | передать UUID v4 (`[guid]::NewGuid()`) |
 | Сканер: 401/403 на `analyze-photo` | в клиенте неверный `VITE_SUPABASE_ANON_KEY` или функция задеплоена с `verify_jwt` и без заголовка | сверить ключ в переменных Vercel и заголовки `apikey`/`Authorization` |
