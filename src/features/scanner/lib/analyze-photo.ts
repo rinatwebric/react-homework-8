@@ -13,6 +13,8 @@ import {
 export type AnalyzeErrorCode =
   | 'NOT_CONFIGURED'
   | 'INVALID_INPUT'
+  /** Клиентский код: исходное фото слишком большое, чтобы вообще пытаться отправить. */
+  | 'SOURCE_TOO_LARGE'
   | 'FILE_TOO_LARGE'
   | 'UNSUPPORTED_MEDIA'
   | 'RATE_LIMITED'
