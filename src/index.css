@@ -1,0 +1,62 @@
+@import 'tailwindcss';
+
+/*
+  Дизайн-токены SuuTech (Tailwind v4, @theme).
+  Важно: зелёный/жёлтый/оранжевый/красный зарезервированы под уровни риска.
+  Бренд и кнопки — синие. Зелёный акцент из генератора дизайн-системы заменён (docs/decisions.md).
+*/
+@theme {
+  --font-sans: 'Golos Text Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+
+  /* Бренд */
+  --color-brand: #1e40af;
+  --color-brand-strong: #1e3a8a;
+  --color-brand-soft: #dbeafe;
+  --color-on-brand: #ffffff;
+
+  /* Поверхности и текст */
+  --color-background: #eff6ff;
+  --color-foreground: #1e3a8a;
+  --color-card: #ffffff;
+  --color-muted: #e9eff5;
+  --color-muted-foreground: #475569;
+  --color-border: #bfdbfe;
+  --color-ring: #1e40af;
+
+  /* Уровни риска: текст + фон (контраст ≥ 4.5:1) */
+  --color-risk-normal: #15803d;
+  --color-risk-normal-surface: #dcfce7;
+  --color-risk-elevated: #a16207;
+  --color-risk-elevated-surface: #fef9c3;
+  --color-risk-high: #c2410c;
+  --color-risk-high-surface: #ffedd5;
+  --color-risk-critical: #b91c1c;
+  --color-risk-critical-surface: #fee2e2;
+
+  --radius-card: 1rem;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    /* место под нижнюю навигацию и «чёлку» iPhone */
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-ring;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
