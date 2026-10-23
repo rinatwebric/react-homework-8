@@ -7,7 +7,7 @@ import {
 } from '../lib/analyze-photo'
 import { createClientId } from '../lib/client-id'
 import { compressPhoto } from '../lib/compress'
-import { checkPhoto, type PhotoProblem } from '../lib/photo-file'
+import { checkCompressed, checkPhoto, type PhotoProblem } from '../lib/photo-file'
 
 export type ScanStep = 'compressing' | 'analyzing'
 
@@ -60,6 +60,21 @@ export function usePhotoScan() {
       try {
         const compressed = await compressPhoto(file)
         if (runId !== runIdRef.current) return { ok: true }
+
+        // После сжатия файл обязан уложиться в лимит бакета: иначе сервер ответит 413,
+        // и житель увидит «сервис недоступен» вместо понятной причины.
+        const compressProblem = checkCompressed(compressed)
+        if (compressProblem) {
+          setState({
+            status: 'failed',
+            previewUrl,
+            error: new AnalyzeError(
+              'FILE_TOO_LARGE',
+              'Не удалось сжать фото до 2 МБ — снимите ещё раз',
+            ),
+          })
+          return { ok: false, problem: compressProblem }
+        }
 
         setState({ status: 'working', previewUrl, step: 'analyzing' })
         // Язык подсказок модели = язык интерфейса. Кыргызский включается флагом,
