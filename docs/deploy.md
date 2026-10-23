@@ -179,10 +179,13 @@ curl -s \
    ```bash
    curl -s -X POST "https://<ref>.supabase.co/functions/v1/analyze-photo" \
      -H "apikey: <anon-key>" -H "Authorization: Bearer <anon-key>" \
-     -F "file=@photo.jpg" -F "client_id=smoke-1" -F "lang=ru" -F "mode=resident"
+     -F "file=@photo.jpg" -F "client_id=<uuid-v4>" -F "lang=ru" -F "mode=resident"
    # 200 → { "assessment": {...}, "cached": false, "contract_version": 1, "photo_path": "..." }
    # повторить тот же файл → "cached": true (ответ из кэша по SHA-256)
    ```
+
+   `client_id` — **UUID v4** (`[guid]::NewGuid()` в PowerShell), иначе 400 `client_id должен быть UUID`.
+   Это тот же идентификатор устройства, что генерирует клиент для лимита 12 запросов/час.
 
 5. Ожидаемые ошибки: нет файла → 400 `INVALID_INPUT`; >2 МБ → 413 `FILE_TOO_LARGE`;
    GIF/HEIC → 415 `UNSUPPORTED_MEDIA`; 13-й запрос за час с одним `client_id` → 429 `RATE_LIMITED`;
@@ -201,4 +204,6 @@ curl -s \
 | Нет кнопки «Установить» | открыто по HTTP или уже установлено | только HTTPS; Chrome показывает баннер не всегда — меню «Установить приложение» |
 | Билд падает на `tsc -b` | ошибка типов | локально `npm run build` и починить до пуша |
 | Сканер: 503 `NOT_CONFIGURED` | не задан `VISION_API_KEY` (или пустой `VISION_MODEL`) | `npx supabase secrets set ...` и повторный вызов; секреты применяются без редеплоя |
+| Сканер: 502 `SERVER` + «Модель отклонила запрос (401)» | ключ не от Gemini (ключи Gemini начинаются с `AIza`), ограничен по API или скопирован с пробелом/кавычками | проверить ключ напрямую: `curl -s -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent" -H "x-goog-api-key: <ключ>" -H "Content-Type: application/json" -d '{"contents":[{"parts":[{"text":"ping"}]}]}'` → должен вернуть `candidates`; иначе выпустить новый в <https://aistudio.google.com/apikey> и повторить `secrets set` |
+| Сканер: 400 `client_id должен быть UUID` | смоук-запрос с произвольной строкой | передать UUID v4 (`[guid]::NewGuid()`) |
 | Сканер: 401/403 на `analyze-photo` | в клиенте неверный `VITE_SUPABASE_ANON_KEY` или функция задеплоена с `verify_jwt` и без заголовка | сверить ключ в переменных Vercel и заголовки `apikey`/`Authorization` |
