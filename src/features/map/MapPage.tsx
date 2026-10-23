@@ -21,6 +21,8 @@ import {
   serializeMapFilters,
   type MapFilters,
 } from './lib/map-filters'
+import { countReportsByZone } from './lib/zone-contains'
+import type { ZoneCollection } from './lib/zone-geojson'
 
 /** Стабильная пустая карта уровней: новый Map на каждый рендер перерисовывал бы все зоны. */
 const NO_LEVELS = new Map<string, RiskLevel>()
@@ -55,13 +57,16 @@ export default function MapPage() {
   )
 
   const reportsByZone = useMemo(() => {
-    const counts = new Map<string, number>()
-    for (const report of visibleReports) {
-      if (!report.zone_id) continue
-      counts.set(report.zone_id, (counts.get(report.zone_id) ?? 0) + 1)
-    }
-    return counts
-  }, [visibleReports])
+    const collections = [
+      adm1.status === 'ready' ? adm1.data : null,
+      adm2.status === 'ready' ? adm2.data : null,
+    ].filter((item): item is ZoneCollection => item !== null)
+
+    if (collections.length === 0) return new Map<string, number>()
+
+    // zone_id отчёта — слаг пилота, ключ границ — shapeID: раскладываем отчёты геометрией.
+    return countReportsByZone(visibleReports, collections)
+  }, [adm1, adm2, visibleReports])
 
   const zonesError = (adm1.status === 'error' && adm1) || (adm2.status === 'error' && adm2) || null
   const zonesLoading = adm1.status === 'loading' || adm2.status === 'loading'

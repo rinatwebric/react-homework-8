@@ -15,6 +15,8 @@
 - [x] 7. `lib/zone-style.ts`, `lib/marker-visuals.ts`, `lib/report-icon.ts` — 13 тестов
 - [x] 8. Хуки загрузки: `useZoneGeo`, `useZoneRisk`, `usePublicReports` + `shared/lib/rest.ts` и `use-async-data.ts` — 9 тестов
 - [x] 9. Компоненты: `CountryMap`, `ZoneLayer`, `ReportMarkers`, `ReportPopup`, `MapFiltersBar`, `ZoneInfoCard`, `MapLegend`
+- [x] 9a. `lib/zone-contains.ts` (ray casting) — отчёты раскладываются по зонам геометрией: `reports.zone_id`
+      и `zone_risk.zone_id` живут в разных пространствах имён (слаг пилота vs `shapeID`) — 9 тестов
 - [x] 10. `MapPage` вместо `MapPreview` (`MapPreview` остался для `/admin`), ключи i18n в `ru.json`
 - [x] 11. `docs/decisions.md` (лицензии geoBoundaries, кластеры, hex-палитра, публичные данные), `docs/plan.md`
 - [x] 12. `npm run build` + `npm run lint` (0 ошибок) + `npm run test` (146) + `npm run verify:sql`; бюджет чанков проверен
