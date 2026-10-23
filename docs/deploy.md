@@ -44,6 +44,18 @@ git push -u origin main
    только в секретах Edge Functions: `npx supabase secrets set ...`.
 5. **Deploy**. Первый билд ~1–2 мин. Получим `https://<project>.vercel.app`.
 
+Прод SuuTech: <https://suutech.vercel.app> (публичный). Preview-URL вида
+`suutech-git-<branch>-<team>.vercel.app` закрыт Vercel Authentication (302 на SSO) — для показа
+жюри и проверки с телефона брать прод-домен (или отключить Deployment Protection для preview).
+
+Проверка, что переменные реально попали в собранный бандл (после Redeploy):
+
+```bash
+curl -s https://suutech.vercel.app/assets/index-*.js | grep -c ljwyrvyzvuxauylmtosp
+```
+
+`0` → `VITE_SUPABASE_*` не заданы для Production (или не было передеплоя).
+
 ### 1.3 Автодеплой
 
 - Пуш в `main` → production-деплой; пул-реквест → preview-URL.
@@ -55,6 +67,14 @@ git push -u origin main
   - `Content-Type: application/manifest+json` для манифеста.
 - HTTPS и домен `*.vercel.app` — автоматически. **PWA ставится только по HTTPS**
   (по локальному `http://192.168.x.x:5173` install-промпта не будет — это не secure context).
+
+### 1.4 Частая ошибка сборки на Vercel: платформенный бинарь в `devDependencies`
+
+`npm ci` на Linux падает, если в `devDependencies` лежит пакет только для Windows
+(например, `@rolldown/binding-win32-x64-msvc`): `EBADPLATFORM … wanted {os:"win32"}`.
+Такой пакет не добавляем руками — нужные бинарники приходят через `optionalDependencies`
+(`lightningcss`, `rolldown`). Если локально на Windows падает `require('lightningcss')`,
+лечим переустановкой (`npm install --prefer-online`), а не правкой `package.json`.
 
 ## 2. Backend (Supabase) — миграция
 

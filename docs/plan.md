@@ -9,7 +9,10 @@
 - [x] Роутер: `/`, `/scan`, `/map` (lazy), `/water`, `/admin` (lazy, вне мобильной оболочки), 404; error boundary; i18n (ru) с первым экраном
 - [x] `vite-plugin-pwa` (injectManifest, `src/sw.ts`), manifest, иконки
 - [x] Supabase: `supabase init`, первая миграция (таблицы, RLS, view, бакет), `.env.example`
-- [x] Деплой на Vercel, переменные окружения — репозиторий подключён к Vercel владельцем (автодеплой из `main`), переменные окружения заданы. Ссылку на прод даёт дашборд Vercel; инструкция и проверка PWA — `docs/deploy.md`
+- [x] Деплой на Vercel, переменные окружения — репозиторий подключён к Vercel владельцем (автодеплой из `main`), прод: <https://suutech.vercel.app> (публичный, без SSO).
+  Preview-деплои закрыты Vercel Authentication. ⚠️ На 2026-10-23 в прод-бандле **нет** `VITE_SUPABASE_URL`/`VITE_SUPABASE_ANON_KEY` —
+  переменные надо задать в дашборде (Production + Preview) и передеплоить, иначе сканер честно скажет «сервис не настроен».
+  Инструкция и проверка PWA — `docs/deploy.md`
 - **Контрольная точка:** пустое приложение открывается по HTTPS-ссылке и ставится на телефон
 
 ## Срез 1 — AI-сканер (P0) · `suutech-ai-scanner`
