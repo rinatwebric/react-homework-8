@@ -2,6 +2,7 @@ import { Suspense, type ReactElement } from 'react'
 import { createBrowserRouter } from 'react-router-dom'
 import { HomePage } from '../features/home/HomePage'
 import { ScanPage } from '../features/scanner/ScanPage'
+import { WaterPage } from '../features/water/WaterPage'
 import { RouteErrorElement } from './ErrorBoundary'
 import { AdminPage, MapPage } from './lazyRoutes'
 import { NotFoundPage } from './NotFoundPage'
@@ -21,8 +22,14 @@ export const router = createBrowserRouter([
       { index: true, element: <HomePage /> },
       { path: 'scan', element: <ScanPage /> },
       { path: 'map', element: withSuspense(<MapPage />) },
-      { path: 'admin', element: withSuspense(<AdminPage />) },
+      { path: 'water', element: <WaterPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
+  },
+  {
+    // Панель служб живёт вне мобильной оболочки: на десктопе — свой сайдбар.
+    path: '/admin',
+    element: withSuspense(<AdminPage />),
+    errorElement: <RouteErrorElement />,
   },
 ])

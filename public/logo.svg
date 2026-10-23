@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="SuuTech">
-  <rect width="512" height="512" fill="#1E40AF" />
+  <rect width="512" height="512" fill="#123A5C" />
   <path
     d="M256 104c0 0-96 116-96 186a96 96 0 0 0 192 0c0-70-96-186-96-186Z"
     fill="#FFFFFF"
@@ -7,7 +7,7 @@
   <path
     d="M196 302c16-14 32-14 48 0s32 14 48 0 32-14 48 0"
     fill="none"
-    stroke="#1E40AF"
+    stroke="#123A5C"
     stroke-width="16"
     stroke-linecap="round"
   />

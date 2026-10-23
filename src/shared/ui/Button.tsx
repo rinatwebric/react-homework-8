@@ -2,21 +2,25 @@ import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { cx } from '../lib/cx'
 
-export type ButtonVariant = 'primary' | 'secondary' | 'ghost'
-export type ButtonSize = 'md' | 'lg'
+export type ButtonVariant = 'primary' | 'ink' | 'outline' | 'ghost'
+export type ButtonSize = 'md' | 'lg' | 'icon'
 
 const BASE =
-  'inline-flex items-center justify-center gap-2 rounded-xl text-center font-semibold transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-60'
+  'inline-flex items-center justify-center gap-2 rounded-2xl text-center font-semibold transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-60'
 
 const SIZES: Record<ButtonSize, string> = {
   // ≥ 48 px — кнопки должны нажиматься на улице
   md: 'min-h-12 px-4 text-base',
-  lg: 'min-h-14 px-5 text-lg',
+  lg: 'min-h-14 px-4 text-base',
+  // Кнопка-иконка: без горизонтальных отступов, чтобы иконка не сжималась.
+  icon: 'size-14 p-0',
 }
 
 const VARIANTS: Record<ButtonVariant, string> = {
-  primary: 'bg-brand text-on-brand hover:bg-brand-strong',
-  secondary: 'border border-border bg-card text-brand hover:bg-brand-soft',
+  // Главное действие экрана — лайм с «чернильным» текстом (макет)
+  primary: 'bg-lime text-on-lime hover:bg-lime-strong',
+  ink: 'bg-ink text-on-ink hover:bg-ink-strong',
+  outline: 'border border-ink/15 bg-card text-ink hover:bg-soft',
   ghost: 'bg-transparent text-brand hover:bg-brand-soft',
 }
 
@@ -45,6 +49,8 @@ export type ButtonLinkProps = {
   variant?: ButtonVariant
   size?: ButtonSize
   className?: string
+  /** Подпись, если внутри только иконка. */
+  ariaLabel?: string
 }
 
 export function ButtonLink({
@@ -53,9 +59,10 @@ export function ButtonLink({
   variant = 'primary',
   size = 'lg',
   className,
+  ariaLabel,
 }: ButtonLinkProps) {
   return (
-    <Link to={to} className={buttonClasses(variant, size, className)}>
+    <Link to={to} aria-label={ariaLabel} className={buttonClasses(variant, size, className)}>
       {children}
     </Link>
   )

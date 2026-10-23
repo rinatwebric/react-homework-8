@@ -27,7 +27,7 @@ export function ErrorState({ title, message, onRetry, className }: ErrorStatePro
         <p className="text-sm text-muted-foreground">{message ?? t('states.errorText')}</p>
       </div>
       {onRetry ? (
-        <Button variant="secondary" size="md" onClick={onRetry} className="mt-1">
+        <Button variant="outline" size="md" onClick={onRetry} className="mt-1">
           <RefreshCw aria-hidden className="size-4" />
           {t('states.retry')}
         </Button>

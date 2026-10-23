@@ -2,38 +2,66 @@
 
 /*
   Дизайн-токены SuuTech (Tailwind v4, @theme).
-  Важно: зелёный/жёлтый/оранжевый/красный зарезервированы под уровни риска.
-  Бренд и кнопки — синие. Зелёный акцент из генератора дизайн-системы заменён (docs/decisions.md).
+  Визуальный язык — по макетам команды: светлый голубой фон, тёмно-синие карточки,
+  мягкие белые карточки с тенью, лаймовый CTA.
+
+  Важно: голубой/янтарный/коралловый/тёмно-красный — шкала риска.
+  Лайм закреплён только за главным действием (кнопки), в шкале риска не используется.
+  Шрифт — Golos Text (кириллица + ө/ү/ң), подключён локально (docs/decisions.md).
 */
 @theme {
   --font-sans: 'Golos Text Variable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
 
-  /* Бренд */
-  --color-brand: #1e40af;
-  --color-brand-strong: #1e3a8a;
-  --color-brand-soft: #dbeafe;
-  --color-on-brand: #ffffff;
+  /* «Чернильный» синий: карточка риска, сайдбар /admin, заголовки */
+  --color-ink: #123a5c;
+  --color-ink-strong: #0e2c49;
+  --color-on-ink: #ffffff;
+
+  /* Бренд: ссылки, иконки, активный таб */
+  --color-brand: #17457a;
+  --color-brand-strong: #103a68;
+  --color-brand-bright: #2f7be0;
+  --color-brand-soft: #e3eff9;
+
+  /* Лаймовый CTA — только главное действие экрана */
+  --color-lime: #b6e534;
+  --color-lime-strong: #a5d31f;
+  --color-on-lime: #0f2c46;
 
   /* Поверхности и текст */
-  --color-background: #eff6ff;
-  --color-foreground: #1e3a8a;
+  --color-background: #f1f7fb;
+  --color-foreground: #123a5c;
   --color-card: #ffffff;
-  --color-muted: #e9eff5;
-  --color-muted-foreground: #475569;
-  --color-border: #bfdbfe;
-  --color-ring: #1e40af;
+  --color-soft: #e3eff9;
+  --color-muted: #edf4fa;
+  --color-muted-foreground: #5b7288;
+  --color-border: #dbe8f3;
+  --color-ring: #17457a;
+
+  /* Графики (уровень воды) */
+  --color-aqua: #8fd6e6;
+  --color-sun: #f2a93b;
 
   /* Уровни риска: текст + фон (контраст ≥ 4.5:1) */
-  --color-risk-normal: #15803d;
-  --color-risk-normal-surface: #dcfce7;
-  --color-risk-elevated: #a16207;
-  --color-risk-elevated-surface: #fef9c3;
-  --color-risk-high: #c2410c;
-  --color-risk-high-surface: #ffedd5;
-  --color-risk-critical: #b91c1c;
-  --color-risk-critical-surface: #fee2e2;
+  --color-risk-normal: #0e6d86;
+  --color-risk-normal-surface: #dff3f8;
+  --color-risk-elevated: #8a5300;
+  --color-risk-elevated-surface: #fcebd2;
+  --color-risk-high: #a32b1b;
+  --color-risk-high-surface: #faddda;
+  --color-risk-critical: #8e2317;
+  --color-risk-critical-surface: #f6d3ce;
 
-  --radius-card: 1rem;
+  /* Заливка сегментов шкалы риска (светлее текстовых, как в макете) */
+  --color-risk-normal-fill: #8fd6e6;
+  --color-risk-elevated-fill: #f2a93b;
+  --color-risk-high-fill: #e4644e;
+  --color-risk-critical-fill: #c33b2a;
+
+  --radius-card: 1.5rem;
+  --radius-tile: 1.25rem;
+  /* Мягкая тень карточек из макета */
+  --shadow-card: 0 10px 30px -14px rgb(18 58 92 / 0.3);
 }
 
 @layer base {
