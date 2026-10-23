@@ -9,7 +9,12 @@ describe('zoneStyle', () => {
 
     expect(style.fillColor).toBe(NO_DATA_FILL_HEX)
     expect(style.fillColor).not.toBe(RISK_FILL_HEX.normal)
-    expect(style.dashArray).toBe('5 4')
+    expect(style.dashArray).toBe('6 4')
+  })
+
+  it('заливка читается на подложке OSM даже без данных (регрессия: 0.18 было почти не видно)', () => {
+    expect(zoneStyle(null).fillOpacity).toBeGreaterThanOrEqual(0.3)
+    expect(RISK_LEVELS.every((level) => (zoneStyle(level).fillOpacity ?? 0) >= 0.4)).toBe(true)
   })
 
   it.each(RISK_LEVELS)('уровень %s берёт свой цвет и сплошную обводку', (level) => {

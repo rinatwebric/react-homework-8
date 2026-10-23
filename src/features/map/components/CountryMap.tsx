@@ -1,6 +1,6 @@
 import 'leaflet/dist/leaflet.css'
-import { useState } from 'react'
-import { MapContainer, TileLayer, useMapEvents } from 'react-leaflet'
+import { useEffect, useState } from 'react'
+import { MapContainer, TileLayer, useMap, useMapEvents } from 'react-leaflet'
 import { MAP_TILES, MAP_VIEW, MAP_ZONES } from '../../../config/map'
 import type { RiskLevel } from '../../../config/risk'
 import { cx } from '../../../shared/lib/cx'
@@ -29,6 +29,30 @@ function ZoomWatcher({ onZoom }: { onZoom: (zoom: number) => void }) {
 }
 
 /**
+ * Leaflet запоминает размер контейнера в момент создания карты. Наша карта получает
+ * высоту от flex-раскладки и `min-h` уже после первого рендера, поэтому Leaflet
+ * считал размер 0×0 и не рисовал ни тайлы, ни зоны (`svg height="0"`, `path d="M0 0"`).
+ * Поэтому: явный `absolute inset-0` у контейнера + `invalidateSize` на каждый ресайз.
+ */
+function MapSizeWatcher() {
+  const map = useMap()
+
+  useEffect(() => {
+    const container = map.getContainer()
+    const invalidate = () => map.invalidateSize()
+
+    invalidate()
+    if (typeof ResizeObserver === 'undefined') return
+
+    const observer = new ResizeObserver(invalidate)
+    observer.observe(container)
+    return () => observer.disconnect()
+  }, [map])
+
+  return null
+}
+
+/**
  * Карта страны: OSM-тайлы, контуры областей/районов и кластеры отчётов.
  * Масштаб < `districtsFromZoom` — области, глубже — районы: 41 район на всю страну
  * в мелком масштабе превращается в паутину.
@@ -49,13 +73,16 @@ export function CountryMap({
   return (
     <div className={cx('relative isolate z-0 overflow-hidden rounded-card border border-border', className)}>
       <MapContainer
+        bounds={MAP_VIEW.bounds}
+        boundsOptions={{ padding: [10, 10] }}
         center={MAP_VIEW.center}
         zoom={MAP_VIEW.zoom}
         minZoom={MAP_VIEW.minZoom}
         maxZoom={MAP_VIEW.maxZoom}
         scrollWheelZoom
-        className="h-full w-full"
+        className="absolute inset-0"
       >
+        <MapSizeWatcher />
         <TileLayer
           url={MAP_TILES.url}
           maxZoom={MAP_TILES.maxZoom}

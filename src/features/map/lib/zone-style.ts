@@ -14,14 +14,17 @@ export function zoneFillColor(level: RiskLevel | null): string {
 /**
  * `selected` — зона, по которой кликнули: толще и плотнее, остальные приглушены не будут
  * (карта страны и так светлая, лишняя логика приглушения — шум).
+ *
+ * Контраст подобран по живому скриншоту: при `fillOpacity 0.18` и пунктире 1 px зоны на
+ * подложке OSM не читались вообще. Теперь данные видны сразу, а подложка — сквозь заливку.
  */
 export function zoneStyle(level: RiskLevel | null, selected = false): PathOptions {
   return {
     color: MAP_INK_HEX,
-    weight: selected ? 3 : 1,
-    opacity: selected ? 0.9 : 0.4,
+    weight: selected ? 3.5 : 1.5,
+    opacity: selected ? 0.9 : 0.55,
     fillColor: zoneFillColor(level),
-    fillOpacity: selected ? 0.6 : level ? 0.3 : 0.18,
-    dashArray: level ? undefined : '5 4',
+    fillOpacity: selected ? 0.65 : level ? 0.42 : 0.32,
+    dashArray: level ? undefined : '6 4',
   }
 }
