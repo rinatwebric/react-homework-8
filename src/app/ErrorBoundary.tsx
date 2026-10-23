@@ -49,7 +49,7 @@ function ErrorScreen({ title, message }: ScreenProps) {
       <p className="text-muted-foreground">{message}</p>
       <div className="flex flex-col gap-3">
         <Button onClick={() => window.location.reload()}>{t('states.reload')}</Button>
-        <ButtonLink to="/" variant="secondary">
+        <ButtonLink to="/" variant="outline">
           {t('states.home')}
         </ButtonLink>
       </div>

@@ -28,13 +28,13 @@ export function RiskBadge({ level, className }: RiskBadgeProps) {
   return (
     <span
       className={cx(
-        'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-sm font-semibold',
+        'inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-sm font-semibold',
         badge,
         className,
       )}
     >
       <Icon aria-hidden className="size-4" strokeWidth={2.5} />
-      {t(`risk.${level}`)}
+      {t(`risk.badge.${level}`)}
     </span>
   )
 }

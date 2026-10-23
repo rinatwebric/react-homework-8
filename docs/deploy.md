@@ -48,7 +48,7 @@ git push -u origin main
 
 - Пуш в `main` → production-деплой; пул-реквест → preview-URL.
 - `vercel.json` уже содержит:
-  - SPA-fallback: пути без точки (`/scan`, `/map`, `/admin`, `/404`) отдают `index.html`,
+  - SPA-fallback: пути без точки (`/scan`, `/map`, `/water`, `/admin`, `/404`) отдают `index.html`,
     а файлы (`/sw.js`, `/manifest.webmanifest`, `/assets/*`) — как есть;
   - `Cache-Control: must-revalidate` для `/sw.js` (иначе браузер застрянет на старом SW);
   - `immutable`-кэш для `/assets/*` (хэш в имени файла);
