@@ -202,6 +202,36 @@ curl -s \
 
    `verify_jwt` оставляем включённым (по умолчанию): клиент шлёт anon-ключ в `Authorization`.
 
+   **Рабочая связка без Docker и без `supabase login`** (проверено 2026-10-24 на `submit-report`):
+   токен владельца в переменной окружения, бандл собирается в облаке, пароль БД не нужен.
+
+   ```powershell
+   $env:SUPABASE_ACCESS_TOKEN = 'sbp_…'   # PAT владельца (Account → Access Tokens), в файл не сохранять
+   npx supabase link --project-ref ljwyrvyzvuxauylmtosp --yes
+   npx supabase functions deploy submit-report --project-ref ljwyrvyzvuxauylmtosp --use-api --yes
+   ```
+
+   - `--use-api` — бандлинг на стороне Supabase (без Docker); уходят `index.ts` и все `_shared/*.ts`.
+   - Прогресс («Uploading asset …») CLI пишет в **stderr**, поэтому PowerShell рисует `NativeCommandError`
+     и «exit code 1» даже при успехе. Настоящий код возврата смотреть так:
+     `cmd /c "npx supabase functions deploy … > out.txt 2> err.txt"`; успех — строка
+     `Deployed Functions on project <ref>: <name>`.
+   - Особенность CLI 2.122 с PAT: `projects list` и `db push` падают с «Cannot find project ref. Have you run
+     supabase link?», хотя `link` и `functions deploy` работают. Миграцию без пароля БД применять через
+     Management API (тот же путь, что у MCP `apply_migration`):
+
+   ```powershell
+   $sql = Get-Content supabase/migrations/<file>.sql -Raw -Encoding UTF8
+   $rec = "`ninsert into supabase_migrations.schema_migrations (version, name) values ('<version>','<name>') on conflict (version) do nothing;"
+   $body = @{ query = ($sql + $rec) } | ConvertTo-Json -Compress
+   Invoke-RestMethod -Method Post -ContentType 'application/json; charset=utf-8' `
+     -Uri "https://api.supabase.com/v1/projects/<ref>/database/query" `
+     -Headers @{ Authorization = "Bearer $env:SUPABASE_ACCESS_TOKEN" } `
+     -Body ([System.Text.Encoding]::UTF8.GetBytes($body))
+   ```
+
+   Без строки в `schema_migrations` следующий `db push` попробует применить миграцию повторно.
+
 4. Smoke-тест (подставьте свой файл и ключи):
 
    ```bash
@@ -244,7 +274,11 @@ curl -s \
    - `npx supabase db push --linked` — если CLI залогинен под владельцем проекта;
    - `npx supabase db push --password <db-password>` (или `--db-url "postgresql://postgres.<ref>:<pwd>@...:5432/postgres"`) —
      если пароль БД под рукой: в `supabase/.temp/pooler-url` пароля **нет**, только хост и пользователь;
-   - SQL Editor в Dashboard: вставить `supabase/migrations/20261024120000_report_submit.sql` целиком.
+   - SQL Editor в Dashboard: вставить `supabase/migrations/20261024120000_report_submit.sql` целиком;
+   - Supabase MCP в Cline (`~/.cline/data/settings/cline_mcp_settings.json`, сервер `supabase`,
+     `type: streamableHttp`, `url` с `project_ref`): авторизация OAuth под владельцем проекта, затем
+     `apply_migration` + `deploy_edge_function` из чата. Правило `AGENTS.md` — MCP только `read_only=true`,
+     доступ на запись включается на одну сессию деплоя и сразу снимается (см. `docs/decisions.md`).
 
 ## 6. Откат / типовые проблемы
 
