@@ -239,8 +239,12 @@ curl -s \
    Тело — `SubmitReportRequest` из `supabase/functions/_shared/report-schema.ts`. 400 `INVALID_INPUT` — тело
    не по схеме, в т.ч. `photo_path` не в папке своего `client_id`; 429 `RATE_LIMITED` — больше 10 отчётов в час
    с одного `device_hash` или 30 с одной сети (хэш IP). Координаты и хэши в лог не пишутся — только пути полей.
-   Миграцию перед первым вызовом: `npx supabase db push` (или применить
-   `supabase/migrations/20261024120000_report_submit.sql` в SQL Editor).
+   Миграцию применить **до** первого вызова, любой из вариантов:
+
+   - `npx supabase db push --linked` — если CLI залогинен под владельцем проекта;
+   - `npx supabase db push --password <db-password>` (или `--db-url "postgresql://postgres.<ref>:<pwd>@...:5432/postgres"`) —
+     если пароль БД под рукой: в `supabase/.temp/pooler-url` пароля **нет**, только хост и пользователь;
+   - SQL Editor в Dashboard: вставить `supabase/migrations/20261024120000_report_submit.sql` целиком.
 
 ## 6. Откат / типовые проблемы
 
@@ -252,7 +256,7 @@ curl -s \
 | Билд падает на `tsc -b` | ошибка типов | локально `npm run build` и починить до пуша |
 | Сканер: 503 `NOT_CONFIGURED` | не задан `VISION_API_KEY` (или пустой `VISION_MODEL`) | `npx supabase secrets set ...` и повторный вызов; секреты применяются без редеплоя |
 | Сканер: 502 `SERVER` + «Модель отклонила запрос (401)» | ключ не от Gemini, ограничен по API или скопирован с пробелом/кавычками | проверить ключ напрямую: `curl -s -X POST "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent" -H "x-goog-api-key: <ключ>" -H "Content-Type: application/json" -d '{"contents":[{"parts":[{"text":"ping"}]}]}'` → должен вернуть `candidates`; иначе выпустить новый в <https://aistudio.google.com/apikey> и повторить `secrets set` |
-| `secrets set` / `functions deploy`: 403 «does not have the necessary privileges» | CLI залогинен под другим аккаунтом (`projects list` не показывает проект) | `npx supabase login` под владельцем проекта, `link --project-ref <ref>`, либо задать секреты в Dashboard → Edge Functions → Secrets |
+| `secrets set` / `functions deploy` / `db push` (login role): 403 «does not have the necessary privileges» | CLI залогинен под другим аккаунтом (`projects list` не показывает проект) | `npx supabase login` под владельцем проекта, `link --project-ref <ref>`, либо задать секреты в Dashboard → Edge Functions → Secrets, а миграцию вставить в SQL Editor |
 | Сканер: 502 + «Модель недоступна (404)» в логах | модель снята с обслуживания или закрыта для новых ключей (`gemini-2.5-flash`) | поставить `VISION_MODEL=gemini-3.5-flash-lite`; резерв `VISION_MODEL_FALLBACK` подхватится сам |
 | Сканер: 502 + «Модель недоступна (503)» | «high demand» у провайдера | функция сама повторит на `VISION_MODEL_FALLBACK`; если и он 503 — подождать минуту |
 | Сканер: 403 «Method doesn't allow unregistered callers» | ключ вообще не дошёл до запроса (пустая переменная, лишние кавычки в значении, забыт заголовок) | сверить длину: `$k.Length` (ключ Gemini: `AIza…` ≈ 39 символов или `AQ.…` ≈ 53); для проверки удобнее query-параметр: `...:generateContent?key=$k` |
