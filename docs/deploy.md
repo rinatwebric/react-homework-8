@@ -197,6 +197,7 @@ curl -s \
 
    ```bash
    npx supabase functions deploy analyze-photo
+   npx supabase functions deploy submit-report
    ```
 
    `verify_jwt` оставляем включённым (по умолчанию): клиент шлёт anon-ключ в `Authorization`.
@@ -221,6 +222,25 @@ curl -s \
 6. Проверка на телефоне: камера и галерея → результат за несколько секунд; фото кота → баннер
    «не дом и не участок»; тёмное фото → «низкая уверенность»; то же фото повторно → метка «Из кэша»;
    авиарежим → «Нет связи» без белого экрана; DevTools → в бандле нет `VISION_API_KEY`.
+
+7. `submit-report` (срез 2) — деплой тем же способом, смоук:
+
+   ```bash
+   curl -s -X POST "https://<ref>.supabase.co/functions/v1/submit-report" \
+     -H "apikey: <anon-key>" -H "Authorization: Bearer <anon-key>" \
+     -H "Content-Type: application/json" \
+     -d '{"contract_version":1,"client_id":"<uuid-v4>","device_hash":"<64-hex>","lat":42.42,"lng":76.18,
+          "accuracy_m":8,"water_in_basement":true,"well_depth_m":2.4,"photo_path":"<тот же uuid-v4>/photo.jpg",
+          "risk_level":"medium","confidence":0.62,"findings":[],"recommendations":[],
+          "captured_at":null,"mode":"resident"}'
+   # 200 → { "id": "...", "duplicate": false }; повторить с тем же client_id → "duplicate": true, второй строки нет
+   ```
+
+   Тело — `SubmitReportRequest` из `supabase/functions/_shared/report-schema.ts`. 400 `INVALID_INPUT` — тело
+   не по схеме, в т.ч. `photo_path` не в папке своего `client_id`; 429 `RATE_LIMITED` — больше 10 отчётов в час
+   с одного `device_hash` или 30 с одной сети (хэш IP). Координаты и хэши в лог не пишутся — только пути полей.
+   Миграцию перед первым вызовом: `npx supabase db push` (или применить
+   `supabase/migrations/20261024120000_report_submit.sql` в SQL Editor).
 
 ## 6. Откат / типовые проблемы
 

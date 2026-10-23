@@ -5,7 +5,7 @@ import {
   analyzePhoto,
   type AnalyzeResult,
 } from '../lib/analyze-photo'
-import { createClientId } from '../lib/client-id'
+import { createClientId } from '../../../shared/lib/client-id'
 import { compressPhoto } from '../lib/compress'
 import { checkCompressed, checkPhoto, type PhotoProblem } from '../lib/photo-file'
 
@@ -100,5 +100,5 @@ export function usePhotoScan() {
     [clientId, releasePreview],
   )
 
-  return { state, start, reset }
+  return { state, start, reset, clientId }
 }

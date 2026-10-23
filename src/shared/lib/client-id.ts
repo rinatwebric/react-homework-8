@@ -1,6 +1,9 @@
 /**
- * client_id сканера: UUID v4, одинаковый на всю сессию экрана.
- * Он же станет reports.client_id в срезе 2 — идемпотентность повторной отправки.
+ * client_id: UUID v4, стабильный на время работы экрана.
+ *
+ * Срез 1 — ключ идемпотентности и лимитов `analyze-photo`;
+ * срез 2 — `reports.client_id` (повторная отправка формы не создаёт дубль).
+ * Живёт в shared, потому что нужен и сканеру, и форме отчёта.
  */
 export function createClientId(): string {
   if (typeof crypto.randomUUID === 'function') return crypto.randomUUID()

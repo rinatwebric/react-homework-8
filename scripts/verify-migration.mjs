@@ -57,6 +57,28 @@ for (const file of migrations) {
   console.log(`— применена миграция ${file} —`)
 }
 
+// Срез 2: колонка для лимита частоты и правило «фото принадлежит отчёту».
+const ipHashColumn = await db.query(`
+  select column_name from information_schema.columns
+  where table_schema = 'public' and table_name = 'reports' and column_name = 'ip_hash'`)
+check('reports.ip_hash существует (лимит по IP)', ipHashColumn.rows.length === 1)
+
+await expectError(
+  'фото из чужой папки отклоняется',
+  `insert into public.reports (client_id, photo_path)
+   values ('77777777-7777-4777-8777-777777777777',
+           'reports/88888888-8888-4888-8888-888888888888/x.jpg')`,
+)
+await db.exec(`insert into public.reports (client_id, photo_path) values
+  ('99999999-9999-4999-8999-999999999999',
+   'reports/99999999-9999-4999-8999-999999999999/x.jpg')`)
+const ownPhoto = await db.query(`
+  select count(*)::int as n from public.reports
+  where client_id = '99999999-9999-4999-8999-999999999999'`)
+check('фото в своей папке client_id принимается', ownPhoto.rows[0].n === 1)
+await db.exec(`
+  delete from public.reports where client_id = '99999999-9999-4999-8999-999999999999'`)
+
 const TABLES_WITH_RLS = [
   'reports',
   'alerts',
@@ -125,6 +147,7 @@ const viewCols = await db.query(
 check('в view только округлённые координаты', viewCols.rows[0].lat_public === 42.348)
 await expectError('anon НЕ видит точный lat в reports', 'select lat from public.reports')
 await expectError('anon НЕ видит device_hash', 'select device_hash from public.reports')
+await expectError('anon НЕ видит ip_hash', 'select ip_hash from public.reports')
 const alerts = await db.query('select * from public.alerts')
 check('anon читает alerts', alerts.rows.length === 1)
 await expectError(

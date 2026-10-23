@@ -19,7 +19,7 @@ import { photoProblemCode, type PhotoProblem } from './lib/photo-file'
  */
 export function ScanPage() {
   const { t } = useTranslation()
-  const { state, start, reset } = usePhotoScan()
+  const { state, start, reset, clientId } = usePhotoScan()
   const [problem, setProblem] = useState<PhotoProblem | null>(null)
 
   const handlePick = useCallback(
@@ -107,11 +107,7 @@ export function ScanPage() {
       {showInput ? <PhotoInput disabled={state.status === 'working'} onPick={handlePick} /> : null}
 
       {state.status === 'done' ? (
-        <AssessmentResult
-          assessment={state.result.assessment}
-          cached={state.result.cached}
-          onRescan={handleRescan}
-        />
+        <AssessmentResult result={state.result} clientId={clientId} onRescan={handleRescan} />
       ) : null}
 
       <Banner tone="info">{t('scan.aiLimit')}</Banner>
