@@ -41,7 +41,7 @@ describe('analyze-photo: разбор успешного ответа', () => {
     const result = parseAnalyzeResponse({
       assessment: ASSESSMENT,
       photo_path: 'reports/abc/0123456789ab.jpg',
-      model: 'gemini-3.8-flash',
+      model: 'gemini-2.5-flash',
       cached: true,
       contract_version: '1.0',
     })

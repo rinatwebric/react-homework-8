@@ -134,7 +134,7 @@ curl -s \
 2. Секреты функции — **только в Supabase**, Vercel их не видит:
 
    ```bash
-   npx supabase secrets set VISION_API_KEY=<ключ vision-модели> VISION_MODEL=<имя модели>
+   npx supabase secrets set VISION_API_KEY=<ключ Google AI Studio> VISION_MODEL=gemini-2.5-flash
    ```
 
    ⚠️ Ключ нельзя хранить в переменных Vercel: с префиксом `VITE_` Vite вшивает его в публичный
@@ -142,8 +142,9 @@ curl -s \
    Function всё равно получает только секреты Supabase. Если ключ уже добавлен в Vercel —
    удалить переменную и **перевыпустить ключ** у провайдера модели.
 
-   `VISION_MODEL` можно не задавать — функция возьмёт значение по умолчанию
-   (`supabase/functions/_shared/vision.ts`). Ключ без модели = 503 `NOT_CONFIGURED`.
+   `VISION_MODEL` можно не задавать — функция возьмёт `gemini-2.5-flash` по умолчанию
+   (`supabase/functions/_shared/vision.ts`). Провайдер — Gemini, ключ из
+   <https://aistudio.google.com/apikey>. Ключ без модели = 503 `NOT_CONFIGURED`.
 
 3. Деплой функции:
 

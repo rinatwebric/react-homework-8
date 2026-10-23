@@ -14,7 +14,7 @@ import { buildSystemInstruction, buildUserPrompt } from './prompt.ts'
 import type { AppLang, ImageMime, ScanMode } from './request.ts'
 
 /** Дефолт, если VISION_MODEL не задан. Меняется секретом, без правок кода. */
-const DEFAULT_MODEL = 'gemini-3.8-flash'
+const DEFAULT_MODEL = 'gemini-2.5-flash'
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta'
 /** Таймаут одного запроса к модели: дольше 25 с житель не ждёт. */
 const REQUEST_TIMEOUT_MS = 25_000
