@@ -35,9 +35,9 @@ npm run dev                  # http://localhost:5173
 
 ```
 src/app/        роутер, layout, error boundary, регистрация SW
-src/features/   home, scanner, map, admin
-src/shared/     ui/ (кнопки, карточки, состояния, бейдж риска), lib/ (i18n, risk, cx), types/
-src/config/     features.ts (флаги), pilot.ts (пилотная зона), risk.ts (уровни риска)
+src/features/   home, scanner, map, water, admin
+src/shared/     ui/ (кнопки, карточки, состояния, бейдж и шкала риска), lib/ (i18n, risk, cx), types/
+src/config/     features.ts (флаги), pilot.ts (пилотная зона), risk.ts (уровни риска), demo.ts (демо-данные)
 src/locales/    ru.json, ky.json
 supabase/       migrations/, config.toml
 scripts/        verify-migration.mjs

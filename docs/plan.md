@@ -6,7 +6,7 @@
 ## Срез 0 — каркас (1–2 ч) · скиллы: `suutech-offline-pwa`, `deploy-to-vercel`, `suutech-backend`
 - [x] Удалить код блога из урока; перевести проект на TypeScript strict (`tsconfig`, `.tsx`), Tailwind v4, структура из `AGENTS.md`
 - [x] Скрипты `build` (tsc + vite), `lint`, `test` (vitest), `typecheck`
-- [x] Роутер: `/`, `/scan`, `/map` (lazy), `/admin` (lazy), 404; error boundary; i18n (ru) с первым экраном
+- [x] Роутер: `/`, `/scan`, `/map` (lazy), `/water`, `/admin` (lazy, вне мобильной оболочки), 404; error boundary; i18n (ru) с первым экраном
 - [x] `vite-plugin-pwa` (injectManifest, `src/sw.ts`), manifest, иконки
 - [x] Supabase: `supabase init`, первая миграция (таблицы, RLS, view, бакет), `.env.example`
 - [ ] Деплой на Vercel, переменные окружения — инструкция готова: `docs/deploy.md` (подключение GitHub в дашборде)

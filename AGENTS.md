@@ -25,10 +25,10 @@ SuuTech — мобильное PWA о подземном подтоплении 
 ## Уровни риска (единые для всего проекта)
 | Зона / датчик / погода | Цвет | Отчёт жителя (AI `risk_level`) |
 |---|---|---|
-| `normal` — норма | зелёный | `low` |
-| `elevated` — повышенный | жёлтый | `medium` |
-| `high` — высокий | оранжевый | `high` |
-| `critical` — критический | красный | — (только правила зоны/датчиков) |
+| `normal` — норма | голубой | `low` |
+| `elevated` — повышенный | янтарный | `medium` |
+| `high` — высокий | коралловый | `high` |
+| `critical` — критический | тёмно-красный | — (только правила зоны/датчиков) |
 Маппинг — одна чистая функция в `src/shared/lib/risk.ts` (+ копия в `supabase/functions/_shared/`).
 
 ## WHAT — стек и структура
@@ -46,7 +46,7 @@ SuuTech — мобильное PWA о подземном подтоплении 
 ```
 src/
   app/            роутер, layout, error boundary, провайдеры
-  features/       scanner/ report/ map/ weather/ sensors/ admin/ offline/ push/ farmer/ premium/
+  features/       scanner/ report/ map/ water/ weather/ sensors/ admin/ offline/ push/ farmer/ premium/
   shared/         ui/ (кнопки, баннеры, состояния), lib/ (supabase, geo, image, i18n, risk), types/
   config/         features.ts (флаги), pilot.ts (центр, bbox пилота), risk.ts (пороги)
   locales/        ru.json, ky.json
@@ -88,7 +88,9 @@ npx supabase functions deploy <name>    # деплой функции
 - TypeScript strict, без `any`. Данные извне (AI, API, датчики, IndexedDB, формы) валидируются `zod`.
 - Каждый экран: состояния loading / error / empty. Error boundary на роутах — **никогда белого экрана**.
 - Mobile-first от 360 px, крупные кнопки (≥ 48 px), риск показывается **цветом + иконкой + текстом**.
-- Зелёный/жёлтый/оранжевый/красный зарезервированы под уровни риска — бренд-цвет и кнопки делай другими (например, синий).
+- Цвета риска (голубой → янтарный → коралловый → тёмно-красный) — только для шкалы риска. Главный CTA —
+  лаймовый (`--color-lime` + текст `--color-on-lime`), карточки риска и сайдбар `/admin` — «чернильные»
+  (`--color-ink`). Лайм не используем для уровней риска.
   Дизайн-токены — в `@theme` (Tailwind v4) в `src/index.css`; иконки — SVG (lucide), не эмодзи.
 - Все тексты интерфейса — через `t('...')`, ключи в `src/locales/ru.json` (+ `ky.json`). Без хардкода.
   Кыргызский перевод не выдумывай: оставь `TODO-ky`-ключи списком в PR для проверки носителем языка.
