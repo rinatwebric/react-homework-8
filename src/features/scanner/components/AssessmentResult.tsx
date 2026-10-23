@@ -40,7 +40,7 @@ export function AssessmentResult({ assessment, cached, onRescan }: AssessmentRes
 
       <Card className="space-y-3">
         <div className="flex flex-wrap items-center gap-2">
-          <h2 className="text-lg font-bold text-ink">{t('scan.resultTitle')}</h2>
+          <h2 className="text-lg font-bold text-ink">{t(`scan.headline.${view.headline}`)}</h2>
           <RiskBadge level={view.zoneLevel} />
           {cached ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2.5 py-1 text-xs font-medium text-muted-foreground">

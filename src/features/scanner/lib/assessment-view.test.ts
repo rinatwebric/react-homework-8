@@ -36,4 +36,12 @@ describe('assessment-view: исход для экрана', () => {
     expect(buildAssessmentView(assessment({ confidence: 1 })).confidencePercent).toBe(100)
     expect(buildAssessmentView(assessment({ confidence: 0 })).confidencePercent).toBe(0)
   })
+
+  it('выбирает заголовок карточки: уровень риска или «не то» фото', () => {
+    expect(buildAssessmentView(assessment({ risk_level: 'low' })).headline).toBe('low')
+    expect(buildAssessmentView(assessment({ risk_level: 'medium' })).headline).toBe('medium')
+    expect(buildAssessmentView(assessment({ risk_level: 'high' })).headline).toBe('high')
+    expect(buildAssessmentView(assessment({ is_relevant: false })).headline).toBe('irrelevant')
+    expect(buildAssessmentView(assessment({ confidence: 0.2 })).headline).toBe('low_confidence')
+  })
 })
