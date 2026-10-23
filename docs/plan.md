@@ -4,12 +4,12 @@
 > Не начинай следующий срез, пока контрольная точка текущего не пройдена. Подробности — `docs/spec.md` §12.
 
 ## Срез 0 — каркас (1–2 ч) · скиллы: `suutech-offline-pwa`, `deploy-to-vercel`, `suutech-backend`
-- [ ] Удалить код блога из урока; перевести проект на TypeScript strict (`tsconfig`, `.tsx`), Tailwind v4, структура из `AGENTS.md`
-- [ ] Скрипты `build` (tsc + vite), `lint`, `test` (vitest), `typecheck`
-- [ ] Роутер: `/`, `/scan`, `/map` (lazy), `/admin` (lazy), 404; error boundary; i18n (ru) с первым экраном
-- [ ] `vite-plugin-pwa` (injectManifest, `src/sw.ts`), manifest, иконки
-- [ ] Supabase: `supabase init`, первая миграция (таблицы, RLS, view, бакет), `.env.example`
-- [ ] Деплой на Vercel, переменные окружения
+- [x] Удалить код блога из урока; перевести проект на TypeScript strict (`tsconfig`, `.tsx`), Tailwind v4, структура из `AGENTS.md`
+- [x] Скрипты `build` (tsc + vite), `lint`, `test` (vitest), `typecheck`
+- [x] Роутер: `/`, `/scan`, `/map` (lazy), `/admin` (lazy), 404; error boundary; i18n (ru) с первым экраном
+- [x] `vite-plugin-pwa` (injectManifest, `src/sw.ts`), manifest, иконки
+- [x] Supabase: `supabase init`, первая миграция (таблицы, RLS, view, бакет), `.env.example`
+- [ ] Деплой на Vercel, переменные окружения — инструкция готова: `docs/deploy.md` (подключение GitHub в дашборде)
 - **Контрольная точка:** пустое приложение открывается по HTTPS-ссылке и ставится на телефон
 
 ## Срез 1 — AI-сканер (P0) · `suutech-ai-scanner`
