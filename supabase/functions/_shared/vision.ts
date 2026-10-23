@@ -13,8 +13,15 @@ import { ApiError } from './errors.ts'
 import { buildSystemInstruction, buildUserPrompt } from './prompt.ts'
 import type { AppLang, ImageMime, ScanMode } from './request.ts'
 
-/** Дефолт, если VISION_MODEL не задан. Меняется секретом, без правок кода. */
-const DEFAULT_MODEL = 'gemini-2.5-flash'
+/**
+ * Дефолт, если VISION_MODEL не задан. Меняется секретом, без правок кода.
+ * `gemini-2.5-flash` закрыт для новых ключей (404 «no longer available»), а
+ * `gemini-3.5-flash` часто отвечает 503 «high demand» — поэтому lite: на демо
+ * отвечает за 1–3 с и держит JSON-схему.
+ */
+const DEFAULT_MODEL = 'gemini-3.5-flash-lite'
+/** Резерв, если основная модель перегружена (5xx) или исчезла (404). */
+const DEFAULT_FALLBACK_MODEL = 'gemini-3.5-flash'
 const API_BASE = 'https://generativelanguage.googleapis.com/v1beta'
 /** Таймаут одного запроса к модели: дольше 25 с житель не ждёт. */
 const REQUEST_TIMEOUT_MS = 25_000
@@ -121,13 +128,26 @@ function extractJson(text: string): unknown {
     .trim()
   return JSON.parse(cleaned)
 }
-function readConfig(): { apiKey: string; model: string } {
+function readConfig(): { apiKey: string; models: string[] } {
   const apiKey = Deno.env.get('VISION_API_KEY')?.trim()
   if (!apiKey) {
     throw new ApiError('NOT_CONFIGURED', 503, 'VISION_API_KEY не задан в секретах функции')
   }
-  const model = (Deno.env.get('VISION_MODEL')?.trim() || DEFAULT_MODEL).replace(/^models\//, '')
-  return { apiKey, model }
+  const primary = (Deno.env.get('VISION_MODEL')?.trim() || DEFAULT_MODEL).replace(/^models\//, '')
+  const fallback = (Deno.env.get('VISION_MODEL_FALLBACK')?.trim() || DEFAULT_FALLBACK_MODEL).replace(
+    /^models\//,
+    '',
+  )
+  // Резерв имеет смысл только если он отличается от основной модели.
+  return { apiKey, models: fallback && fallback !== primary ? [primary, fallback] : [primary] }
+}
+
+/** Модель перегружена или исчезла — можно молча переключиться на резервную. */
+class ModelUnavailable extends ApiError {
+  constructor(message: string) {
+    super('SERVER', 502, message)
+    this.name = 'ModelUnavailable'
+  }
 }
 
 type ModelResponse =
@@ -157,8 +177,12 @@ async function requestModel(
       if (response.status === 429) {
         throw new ApiError('RATE_LIMITED', 429, 'Модель перегружена, попробуйте через минуту')
       }
+      if (response.status === 404) {
+        // Модель снята с обслуживания или закрыта для новых ключей — идём в резерв.
+        throw new ModelUnavailable('Модель недоступна (404)')
+      }
       if (response.status >= 500) {
-        throw new ApiError('SERVER', 502, `Модель недоступна (${response.status})`)
+        throw new ModelUnavailable(`Модель недоступна (${response.status})`)
       }
       return { kind: 'rejected', status: response.status, details }
     }
@@ -178,9 +202,12 @@ async function requestModel(
   }
 }
 
-export async function assessPhoto(input: VisionInput): Promise<VisionOutput> {
-  const { apiKey, model } = readConfig()
-
+/** Одна модель: до двух вызовов (со схемой и без). */
+async function assessWithModel(
+  model: string,
+  apiKey: string,
+  input: VisionInput,
+): Promise<VisionOutput> {
   let lastProblem = ''
 
   // Попытка 1 — со схемой ответа; попытка 2 — без схемы (если провайдер её не принял
@@ -222,4 +249,24 @@ export async function assessPhoto(input: VisionInput): Promise<VisionOutput> {
   }
 
   throw new ApiError('AI_INVALID', 502, `Модель не дала валидную оценку (${lastProblem})`)
+}
+
+export async function assessPhoto(input: VisionInput): Promise<VisionOutput> {
+  const { apiKey, models } = readConfig()
+  let lastError: unknown = null
+
+  for (const model of models) {
+    try {
+      return await assessWithModel(model, apiKey, input)
+    } catch (error) {
+      // Перегруженная/исчезнувшая модель не должна ломать демо: пробуем резерв.
+      if (!(error instanceof ModelUnavailable)) throw error
+      console.error(`[analyze-photo] ${model}: ${error.message}, пробуем резервную модель`)
+      lastError = error
+    }
+  }
+
+  throw lastError instanceof ApiError
+    ? lastError
+    : new ApiError('SERVER', 502, 'Все модели недоступны')
 }
