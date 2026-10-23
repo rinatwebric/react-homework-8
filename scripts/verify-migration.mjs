@@ -85,6 +85,7 @@ const TABLES_WITH_RLS = [
   'push_subscriptions',
   'moderators',
   'photo_assessments',
+  'zone_risk',
 ]
 const relrowsecurity = await db.query(`
   select relname, relrowsecurity from pg_class
@@ -103,6 +104,8 @@ await db.exec(`
   insert into public.moderators (user_id) values ('${modId}');
   insert into public.reports (client_id, lat, lng, risk_level, water_in_basement)
   values ('22222222-2222-2222-2222-222222222222', 42.34793, 76.16690, 'high', true);
+  insert into public.zone_risk (zone_id, level, reasons)
+  values ('92254566B71058624193805', 'elevated', array['demo']);
   insert into public.alerts (level, message, zone_id) values ('high', 'Тест', 'kg-ton');
   insert into public.photo_assessments (sha256, client_id, status, assessment, model)
   values (
@@ -149,6 +152,17 @@ await expectError('anon НЕ видит точный lat в reports', 'select la
 await expectError('anon НЕ видит device_hash', 'select device_hash from public.reports')
 await expectError('anon НЕ видит ip_hash', 'select ip_hash from public.reports')
 const alerts = await db.query('select * from public.alerts')
+// Срез 2, PR-2: уровень риска зоны карта читает публично, писать может только service role.
+const zoneRisk = await db.query('select level, reasons from public.zone_risk')
+check('anon читает zone_risk', zoneRisk.rows.length === 1, `строк: ${zoneRisk.rows.length}`)
+await expectError(
+  'anon НЕ может писать в zone_risk',
+  "insert into public.zone_risk (zone_id, level) values ('kg-test', 'high')",
+)
+await expectError(
+  'anon НЕ может менять уровень зоны',
+  "update public.zone_risk set level = 'critical'",
+)
 check('anon читает alerts', alerts.rows.length === 1)
 await expectError(
   'anon НЕ может вставлять reports',

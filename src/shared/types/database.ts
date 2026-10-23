@@ -9,8 +9,11 @@
  */
 import type { ResidentRiskLevel } from '../../config/risk'
 
-export type ReportStatus = 'new' | 'reviewed' | 'in_progress' | 'resolved'
-export type ReportMode = 'resident' | 'farmer'
+export const REPORT_STATUSES = ['new', 'reviewed', 'in_progress', 'resolved'] as const
+export type ReportStatus = (typeof REPORT_STATUSES)[number]
+
+export const REPORT_MODES = ['resident', 'farmer'] as const
+export type ReportMode = (typeof REPORT_MODES)[number]
 export type AlertLevel = 'elevated' | 'high' | 'critical'
 export type AlertSource = 'weather' | 'sensor' | 'manual'
 export type AlertAudience = 'residents' | 'services'
