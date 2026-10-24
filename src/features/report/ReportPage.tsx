@@ -1,38 +1,41 @@
-import { Send } from 'lucide-react'
+import { Camera, Send } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useLocation } from 'react-router-dom'
 import { PILOT_ZONE } from '../../config/pilot'
+import type { ReportCategory } from '../../shared/lib/categories'
 import { createClientId } from '../../shared/lib/client-id'
-import { distanceMeters } from '../../shared/lib/geo'
-import { toZoneRisk } from '../../shared/lib/risk'
 import { Banner } from '../../shared/ui/Banner'
 import { Button } from '../../shared/ui/Button'
 import { Card } from '../../shared/ui/Card'
 import { ErrorState } from '../../shared/ui/ErrorState'
-import { RiskBadge } from '../../shared/ui/RiskBadge'
 import { ScreenHeader } from '../../shared/ui/ScreenHeader'
 import { readReportContext } from '../../shared/types/report-context'
+import { CategoryPicker } from './components/CategoryPicker'
+import { CommentField } from './components/CommentField'
+import { DangerToggle } from './components/DangerToggle'
 import { LocationSection } from './components/LocationSection'
 import { ReportSent } from './components/ReportSent'
-import { WaterBasementField } from './components/WaterBasementField'
-import { WellDepthField } from './components/WellDepthField'
 import { useGeolocation } from './hooks/useGeolocation'
 import { hashDeviceId, readDeviceId } from './lib/device-id'
 import {
   buildSubmitPayload,
-  parseWellDepth,
+  locationOffsetM,
   submissionBlock,
   type ReportDraft,
 } from './lib/report-draft'
 import { SubmitReportError, submitReport, type SubmitReportErrorCode } from './lib/submit-report'
 
 /**
- * Срез 2, PR-1: отчёт жителя.
+ * Срез 2, PR-2: заявка жителя v2.0 (§7).
  *
- * Обязательно: координаты (GPS или пин на карте) и ответ «вода в подвале».
- * Необязательно: фото с AI-оценкой (приходит из сканера) и глубина колодца.
- * Все записи — только через Edge Function `submit-report`: у anon нет INSERT в reports.
+ * Обязательно: категория и координаты (GPS или пин в радиусе 300 м от GPS).
+ * Необязательно: комментарий до 500 символов, фото из сканера, отметка
+ * «опасно для жизни». AI-оценка фото в заявку не входит — она нужна только
+ * модератору (§8), поэтому и на форму не выводится.
+ *
+ * Все записи — только через Edge Function `submit-report` v4: у anon нет INSERT
+ * в reports.
  */
 export function ReportPage() {
   const { t } = useTranslation()
@@ -40,10 +43,12 @@ export function ReportPage() {
   const photo = useMemo(() => readReportContext(routeLocation.state), [routeLocation.state])
 
   const { state: geo, refining, locate, setManualPoint, availability } = useGeolocation()
-  const [clientId] = useState(createClientId)
+  // client_id сканера становится id заявки: фото уже лежит в его папке.
+  const [clientId] = useState(() => photo?.clientId ?? createClientId())
   const [deviceHash, setDeviceHash] = useState<string | null>(null)
-  const [waterInBasement, setWaterInBasement] = useState<boolean | null>(null)
-  const [wellDepthRaw, setWellDepthRaw] = useState('')
+  const [category, setCategory] = useState<ReportCategory | null>(null)
+  const [comment, setComment] = useState('')
+  const [immediateDanger, setImmediateDanger] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [sent, setSent] = useState<{ id: string; duplicate: boolean } | null>(null)
   const [errorCode, setErrorCode] = useState<SubmitReportErrorCode | null>(null)
@@ -65,19 +70,19 @@ export function ReportPage() {
     }
   }, [])
 
-  const wellParsed = parseWellDepth(wellDepthRaw)
-  const wellError = wellParsed.ok ? null : wellParsed.error
-
-  const draft: ReportDraft = {
-    clientId,
-    deviceHash: deviceHash ?? '',
-    point: geo.point,
-    accuracyM: geo.manual ? null : (geo.gps?.accuracyM ?? null),
-    waterInBasement,
-    wellDepthRaw,
-    gpsOffsetM: geo.gps && geo.point && geo.manual ? distanceMeters(geo.gps, geo.point) : 0,
-    photo,
-  }
+  const draft: ReportDraft = useMemo(
+    () => ({
+      clientId,
+      deviceHash: deviceHash ?? '',
+      category,
+      comment,
+      immediateDanger,
+      point: geo.point,
+      gps: geo.gps ? { lat: geo.gps.lat, lng: geo.gps.lng, accuracyM: geo.gps.accuracyM } : null,
+      photoPath: photo?.photoPath ?? null,
+    }),
+    [clientId, deviceHash, category, comment, immediateDanger, geo.point, geo.gps, photo],
+  )
 
   const block = submissionBlock(draft)
   const canSubmit = !submitting && deviceHash !== null && block === null
@@ -115,36 +120,37 @@ export function ReportPage() {
   return (
     <div className="space-y-4">
       <ScreenHeader title={t('report.title')} />
+      <p className="-mt-2 text-sm leading-snug text-muted-foreground">{t('report.lead')}</p>
 
-      {photo?.riskLevel ? (
-        <Card className="flex items-center justify-between gap-3">
+      {photo?.photoPath ? (
+        <Card className="flex items-start gap-3">
+          <Camera aria-hidden className="mt-0.5 size-5 shrink-0 text-ink" strokeWidth={2.25} />
           <div className="space-y-1">
-            <p className="text-sm font-semibold text-ink">{t('report.photoAttached')}</p>
-            <p className="text-sm leading-snug text-muted-foreground">
-              {t('report.photoAttachedNote')}
-            </p>
+            <p className="text-sm font-semibold text-ink">{t('report.photo.attached')}</p>
+            <p className="text-sm leading-snug text-muted-foreground">{t('report.photo.note')}</p>
           </div>
-          <RiskBadge level={toZoneRisk(photo.riskLevel)} />
         </Card>
       ) : (
-        <Banner tone="info" title={t('report.noPhotoTitle')}>
-          {t('report.noPhotoText')}
+        <Banner tone="info" title={t('report.photo.noneTitle')}>
+          {t('report.photo.noneText')}
         </Banner>
       )}
+
+      <CategoryPicker value={category} onChange={setCategory} />
 
       <LocationSection
         state={geo}
         refining={refining}
-        offsetM={draft.gpsOffsetM}
+        offsetM={locationOffsetM(draft)}
         availability={availability}
         onRelocate={() => void locate()}
         onPlaceManually={() => setManualPoint(PILOT_ZONE.center)}
         onMove={setManualPoint}
       />
 
-      <Card className="space-y-5">
-        <WaterBasementField value={waterInBasement} onChange={setWaterInBasement} />
-        <WellDepthField value={wellDepthRaw} onChange={setWellDepthRaw} error={wellError} />
+      <Card className="space-y-3">
+        <CommentField value={comment} onChange={setComment} />
+        <DangerToggle value={immediateDanger} onChange={setImmediateDanger} />
       </Card>
 
       {errorCode ? (

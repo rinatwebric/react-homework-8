@@ -8,8 +8,21 @@
  * и замени этот файл сгенерированным (структура Database → public.Tables).
  */
 import type { ResidentRiskLevel } from '../../config/risk'
+import type { ReportCategory } from '../lib/categories'
 
-export const REPORT_STATUSES = ['new', 'reviewed', 'in_progress', 'resolved'] as const
+/**
+ * Статусы заявки (§12). `reviewed` — legacy v1.0: остаётся в БД и в фильтрах,
+ * пока прод-админка не переехала на v2 (удаление — PR очистки).
+ */
+export const REPORT_STATUSES = [
+  'new',
+  'triaged',
+  'assigned',
+  'in_progress',
+  'resolved',
+  'rejected',
+  'reviewed',
+] as const
 export type ReportStatus = (typeof REPORT_STATUSES)[number]
 
 export const REPORT_MODES = ['resident', 'farmer'] as const
@@ -30,6 +43,15 @@ export type ReportRow = {
   lng: number | null
   accuracy_m: number | null
   zone_id: string | null
+  /** v2.0 (§14): категория жителя; null — у заявок v1.0. */
+  category_user: ReportCategory | null
+  comment: string | null
+  /** На сколько метров метку сдвинули от GPS (≤300, CHECK в БД). */
+  location_adjusted_m: number | null
+  immediate_danger: boolean
+  weather_snapshot: unknown
+  created_by: string | null
+  /** Поля v1.0: остаются до PR очистки. */
   risk_level: ResidentRiskLevel | null
   confidence: number | null
   findings: string[]
@@ -56,6 +78,10 @@ export type ReportPublicRow = Pick<
   | 'lat_public'
   | 'lng_public'
   | 'zone_id'
+  | 'category_user'
+  | 'comment'
+  | 'immediate_danger'
+  | 'weather_snapshot'
   | 'risk_level'
   | 'confidence'
   | 'findings'

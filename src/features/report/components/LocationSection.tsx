@@ -1,7 +1,8 @@
 import { MapPin, RefreshCw } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { GEO_WEAK_ACCURACY_M, PIN_WARN_OFFSET_M } from '../../../config/report'
+import { GEO_WEAK_ACCURACY_M } from '../../../config/report'
 import { formatAccuracy, type LatLng } from '../../../shared/lib/geo'
+import { MAX_LOCATION_ADJUST_M } from '../../../shared/types/report-contract'
 import { Banner } from '../../../shared/ui/Banner'
 import { Button } from '../../../shared/ui/Button'
 import { Card } from '../../../shared/ui/Card'
@@ -13,7 +14,7 @@ type LocationSectionProps = {
   state: GeolocationState
   refining: boolean
   /** Смещение пина от GPS, метры. */
-  offsetM: number
+  offsetM: number | null
   availability: 'ready' | 'insecure' | 'unsupported'
   onRelocate: () => void
   onPlaceManually: () => void
@@ -23,6 +24,10 @@ type LocationSectionProps = {
 /**
  * Блок геопозиции: карта с перетаскиваемым пином, точность GPS и честное
  * объяснение, если браузер не дал координаты. Без координат отправка закрыта.
+ *
+ * Пин ограничен радиусом 300 м от GPS (§7.2) — не подсказка, а жёсткое правило,
+ * поэтому упор в границу подписан отдельно: житель должен понимать, почему
+ * метка перестала двигаться.
  */
 export function LocationSection({
   state,
@@ -37,6 +42,7 @@ export function LocationSection({
 
   const accuracyM = state.manual ? null : (state.gps?.accuracyM ?? null)
   const weakAccuracy = !state.manual && accuracyM !== null && accuracyM > GEO_WEAK_ACCURACY_M
+  const nearLimit = offsetM !== null && offsetM >= MAX_LOCATION_ADJUST_M - 1
 
   return (
     <section className="space-y-3">
@@ -85,14 +91,16 @@ export function LocationSection({
             <p className="text-xs text-muted-foreground">{t('report.location.refiningHint')}</p>
           ) : null}
 
-          {weakAccuracy ? (
-            <Banner tone="warning">{t('report.location.weakAccuracy')}</Banner>
-          ) : null}
+          {weakAccuracy ? <Banner tone="warning">{t('report.location.weakAccuracy')}</Banner> : null}
 
-          {offsetM > PIN_WARN_OFFSET_M ? (
+          {state.clamped || nearLimit ? (
             <Banner tone="warning">
-              {t('report.location.offset', { meters: Math.round(offsetM) })}
+              {t('report.location.limit', { meters: MAX_LOCATION_ADJUST_M })}
             </Banner>
+          ) : offsetM !== null && offsetM > 0 ? (
+            <p className="text-xs text-muted-foreground">
+              {t('report.location.offset', { meters: Math.round(offsetM) })}
+            </p>
           ) : null}
         </div>
       ) : null}
@@ -121,6 +129,9 @@ export function LocationSection({
               {t('report.location.retry')}
             </Button>
           </div>
+          <p className="text-xs leading-snug text-muted-foreground">
+            {t('report.location.manualNote')}
+          </p>
         </Card>
       ) : null}
     </section>
