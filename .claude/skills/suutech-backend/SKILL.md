@@ -1,78 +1,87 @@
 ---
 name: suutech-backend
-description: SuuTech Supabase backend - schema, migrations, RLS, moderator role, public view with rounded coordinates, Storage bucket, Edge Functions (submit-report idempotency by client_id, rate limits, anti-fraud), CSV export and admin queries. Use together with the official `supabase` and `supabase-postgres-best-practices` skills whenever touching supabase/migrations, supabase/functions, RLS policies, or /admin data access.
+description: SuuTech Supabase backend (v2.0) - additive migrations, reports v2 schema (category_user, comment, location_adjusted_m <= 300, immediate_danger, weather_snapshot), ai_triage, report_status_history trigger, alerts, RLS, moderator role, reports_public view with rounded coordinates, Storage bucket, and Edge Functions submit-report / classify-report / weather-current / send-alert. Use together with the official `supabase` and `supabase-postgres-best-practices` skills whenever touching supabase/migrations, supabase/functions, RLS policies, or /admin data access.
 ---
 
-# Backend SuuTech (Supabase)
+# Backend SuuTech (Supabase, ТЗ v2.0)
 
-Сначала загрузи официальные скиллы `supabase` и `supabase-postgres-best-practices` — они главнее этого файла
-по общим правилам Postgres/RLS. Здесь — решения, специфичные для проекта. Требования: `docs/spec.md` §8–10.
-Датчики, `zone_risk`, `ingest-sensor`, `compute-zone-risk` — в скилле `suutech-sensors`.
+Сначала загрузи официальные скиллы `supabase` и `supabase-postgres-best-practices` — общие правила Postgres/RLS главнее
+этого файла. Здесь — решения проекта. Требования: `docs/spec.md` §7, §8, §12, §14.
 
 ## Правила работы
-- Схема меняется **только миграциями** (`npx supabase migration new <name>`), проверка — `npx supabase db reset` локально.
-- Никаких изменений в продакшен-проекте через MCP или Dashboard. Деплой миграций — `npx supabase db push` человеком.
-- После миграции обнови типы: `npx supabase gen types typescript --local > src/shared/types/database.ts`.
+- Схема меняется **только миграциями** (`npx supabase migration new <name>`), вручную в Dashboard — никогда.
+- **Миграции аддитивные** до конца демо: `add column if not exists`, `create table if not exists`,
+  `drop constraint if exists` перед `add constraint`. Никаких `drop column`/`drop table` без отдельного PR.
+- Локальная проверка без Docker: `npm run verify:sql` (PGlite применяет все миграции и проверяет RLS, права, CHECK).
+  Скрипт `scripts/verify-migration.mjs` расширяется вместе со схемой: новый инвариант = новая проверка.
+- Прод: Management API `POST /v1/projects/{ref}/database/query`, затем строка в `supabase_migrations.schema_migrations`.
+  Разрушительные операции — только после согласования с владельцем.
+- После правок схемы обнови `src/shared/types/database.ts` и копии контрактов в `supabase/functions/_shared/`.
 
-## Модель данных (минимум)
-- `reports`: `id uuid pk default gen_random_uuid()`, `client_id uuid unique not null`, `created_at`, `captured_at`,
-  `photo_path`, `lat double precision`, `lng double precision`, `accuracy_m real`, `zone_id text`,
-  `risk_level text check in ('low','medium','high')` (nullable — отчёт без оценки), `confidence real`,
-  `findings text[]`, `recommendations jsonb`, `water_in_basement boolean not null`, `well_depth_m numeric(5,2)`
-  (nullable, `check (well_depth_m between 0 and 50)`), `mode text check in ('resident','farmer')`,
-  `status text default 'new' check in ('new','reviewed','in_progress','resolved')`, `moderator_note text`,
-  `device_hash text`, `photo_sha256 text`, `is_demo boolean default false`.
-- `zone_id` определяется на сервере в `submit-report` (точка в полигоне района; без PostGIS — по ближайшему
-  центроиду из `zones.json` как упрощение, решение записать в `docs/decisions.md`).
-- Публичные координаты — **генерируемые колонки** `lat_public`/`lng_public` = `round(lat::numeric, 3)` (≈111 м по
-  широте, ≈82 м по долготе на 42° с.ш.).
-- `push_subscriptions`: `endpoint unique`, `keys jsonb`, `area_lat`/`area_lng` (округлено до 2 знаков), `zone_id`, `lang`, `created_at`.
-- `alerts`: `zone_id`, `level ('elevated'|'high'|'critical')`, `message`, `source ('weather'|'sensor'|'manual')`,
-  `audience ('residents'|'services')`, `created_at`. Фильтр «для служб» в `/admin` = `audience = 'services'`.
+## Модель данных v2.0
+- `reports`: `id`, `client_id unique`, `created_at`, `captured_at`, `photo_path` (nullable — фото необязательно),
+  `lat`/`lng`, `accuracy_m`, `zone_id`, **`category_user`**
+  (`basement_water|damp_wall|standing_water|drainage_issue|well_level|road_flooding|other`),
+  **`comment`** (`char_length ≤ 500`), **`location_adjusted_m`** (`0…300`, CHECK),
+  **`immediate_danger boolean default false`**, **`weather_snapshot jsonb`**, `status`, `moderator_note`,
+  `created_by`, `device_hash`, `ip_hash`, `photo_sha256`, `is_demo`.
+  Поля v1.0 (`risk_level`, `confidence`, `findings`, `recommendations`, `water_in_basement`, `well_depth_m`, `mode`)
+  пока живут рядом — их удаляет PR-5, когда фронт переедет на категории.
+- `ai_triage` (1:1 к заявке): `report_id pk`, `category_ai`, `urgency_ai`, `summary`, `recommended_action`,
+  `duplicate_group`, `confidence`, `needs_human_review`, `model`, `created_at`. Наружу не отдаётся.
+- `report_status_history`: `id identity`, `report_id`, `from_status`, `to_status`, `note`, `changed_by`, `created_at`.
+  Пишет триггер `private.log_report_status()` (`security definer`, `set search_path = ''`) на `after update of status`.
+- `alerts`: `level`, `message`, `source`, `audience`, `zone_id`, **`area text`** (зона словами), **`created_by`**.
+- `push_subscriptions`: `endpoint unique`, `keys jsonb`, `area_lat`/`area_lng` (2 знака), `zone_id`, `lang`.
 - `moderators`: `user_id uuid pk references auth.users`.
-- Таблицы датчиков (`sensors`, `sensor_readings`, `zone_risk`) — см. `suutech-sensors`.
-- Индексы: `reports(created_at desc)`, `reports(status)`, `reports(risk_level)`, `reports(zone_id)`, `alerts(created_at desc)`.
+- Индексы: `reports(created_at desc)`, `reports(status)`, `reports(category_user)`, `reports(zone_id)`,
+  `ai_triage(duplicate_group)`, `ai_triage(needs_human_review)`, `report_status_history(report_id, created_at desc)`.
 
-## Доступ (RLS) — ключевое решение
-Supabase-скилл предупреждает: обычные view обходят RLS. Поэтому `reports_public` делаем так:
-1. `reports` — RLS on. Политика `select to anon, authenticated using (true)`, **но** права на колонки:
-   `revoke select on reports from anon, authenticated;`
-   `grant select (id, created_at, lat_public, lng_public, zone_id, risk_level, confidence, findings, recommendations, water_in_basement, well_depth_m, status, photo_path, is_demo) on reports to anon, authenticated;`
-2. `create view reports_public with (security_invoker = true) as select <только эти колонки> from reports;`
-3. Модераторы: функция `private.is_moderator()` (`security definer`, `stable`, `set search_path = ''`, проверяет
-   `auth.uid()` в `moderators`). Полное чтение и `update` статуса — через Edge Function с проверкой модератора
-   или RPC `security definer` с той же проверкой (колонкам `lat`/`lng`/`device_hash` grant для anon не даём).
-4. Вставка отчётов анонимом — **только через `submit-report`** (валидация, лимиты, антифейк). Прямой
-   `insert` для anon не выдаём.
-5. Проверь: от anon `select lat from reports` → ошибка прав; `select * from reports_public` → ок.
+## Статусы (§12)
+`new → triaged → assigned → in_progress → resolved | rejected`. `reviewed` — legacy v1.0 в CHECK, удаляется в PR-5.
+Историю не пиши руками из функции: триггер делает это один раз для любого пути (RPC, функция, SQL).
+
+## Доступ (RLS)
+Supabase-скилл предупреждает: обычные view обходят RLS. Поэтому `reports_public`:
+1. `reports` — RLS on, политика `select using (true)`, но `revoke select` и колоночные гранты:
+   `id, created_at, captured_at, lat_public, lng_public, zone_id, risk_level, confidence, findings, recommendations,
+   water_in_basement, well_depth_m, status, photo_path, mode, is_demo, category_user, comment, immediate_danger,
+   weather_snapshot, accuracy_m`. Точные `lat`/`lng`, `device_hash`, `ip_hash`, `moderator_note`, `created_by`
+   и `ai_triage` наружу не выдаём.
+2. `create or replace view public.reports_public with (security_invoker = true) as select … from reports;`
+   **Новые колонки только в конец списка**: `create or replace view` падает с `42P16`, если вставить колонку в середину.
+3. Модераторы: `private.is_moderator()` (`security definer`, `stable`, `set search_path = ''`, проверяет `auth.uid()`
+   в `moderators`). Политики `select` на `ai_triage` и `report_status_history` — только `authenticated` + эта функция.
+4. Вставка заявок анонимом — только через `submit-report`. Прямого `insert` для anon нет.
+5. Проверка руками: `npm run verify:sql` — anon не видит `lat`, `created_by`, `ai_triage`, историю статусов,
+   но видит `reports_public` без служебных полей.
 
 ## Storage
-- Бакет `report-photos`: только изображения, `file_size_limit` 2 МБ. Пути — UUID (`reports/{client_id}.jpg`).
-- Публичное чтение допустимо для демо (EXIF удалён, путь неугадываемый); запись — только из функций (service role).
+- Бакет `report-photos`: только изображения, `file_size_limit` 2 МБ. Путь — `<client_id>/file.jpg` (допускается префикс `reports/`).
+- CHECK `reports_photo_belongs_to_client` не даёт приложить чужое фото. EXIF удаляется на клиенте, запись — только из функций.
 
 ## Edge Functions (Deno)
-- Общий код: `supabase/functions/_shared/` — `cors.ts`, `ai-contract.ts`, `schemas.ts`, `supabase-admin.ts`,
-  `risk.ts` (маппинг уровней, копия `src/shared/lib/risk.ts`), `weather-rules.ts`, `zone-rules.ts`.
-- Импорты: `npm:zod@4`, `npm:@supabase/supabase-js@2`. Входные данные всегда валидируй zod → 400 с кодом ошибки.
-- Не забывай `OPTIONS` (CORS) и единый формат ошибок `{ error: CODE, message }`.
-- `submit-report` — идемпотентность:
-  `upsert(row, { onConflict: 'client_id', ignoreDuplicates: true }).select('id')`; если вернулось пусто —
-  `select id where client_id = ...`. Ответ всегда `{ id }` (200), даже для дубля.
-  Новый отчёт с `water_in_basement = true` или `risk_level = 'high'` → вызвать `compute-zone-risk` для его зоны.
-- Лимиты: ≤ N отчётов в час на `device_hash` и на IP (`x-forwarded-for`), `N` — константа (например 10).
-  `device_hash` = SHA-256 от случайного UUID устройства из localStorage (не fingerprinting).
-- Антифейк (P2): `accuracy_m` > 200 → отклонить; совпадение `photo_sha256` → пометить дублем; в админке —
-  подсветка кластеров (много отчётов с одного устройства/IP за короткое время).
-- Секреты: `npx supabase secrets set ...`; в коде `Deno.env.get(...)`. Перед деплоем проверь `git grep` на ключи.
+- Общий код: `supabase/functions/_shared/` — `cors.ts`, `schemas.ts`, `supabase-admin.ts`, `categories.ts`,
+  `triage-contract.ts`, `weather.ts`. Импорты `npm:zod@4`, `npm:@supabase/supabase-js@2`.
+- Вход всегда валидируется zod → 400 с кодом; ответы об ошибке `{ error: CODE, message }`; не забывай `OPTIONS`.
+- `submit-report` (v4): `category_user` обязателен; фото необязательно; `location_adjusted_m ≤ 300` проверяется
+  на сервере; `immediate_danger` пишется как есть; `weather_snapshot` подтягивается из погодного кэша.
+  Идемпотентность: `upsert(row, { onConflict: 'client_id', ignoreDuplicates: true })` + `select` при пустом ответе,
+  ответ всегда `{ id }` (200), в теле `duplicate` для повтора.
+  Лимиты: 10 заявок/час на `device_hash` и 30/час на хэш IP; при сбое счётчика «падаем открыто» (log + пропуск).
+- `classify-report`: проверка модератора → контекст заявки и соседей → модель по `triage-contract` →
+  `upsert` в `ai_triage`. AI не меняет `status` и не публикуется.
+- `weather-current`: Open-Meteo, кэш и TTL, без ключа.
+- `send-alert`: ручное предупреждение зоны (баннер + push в PR-5).
+- Секреты: `npx supabase secrets set ...`; в коде `Deno.env.get(...)`; перед деплоем `git grep` по ключам.
 
 ## /admin
-- Вход — Supabase Auth (email+пароль), только аккаунты из `moderators`. Гард в UI — для удобства; защита — в БД.
-- Смена статуса `new → reviewed → in_progress → resolved` + `moderator_note`; статус сразу виден на публичной карте.
-- Зоны: список с уровнем и причинами (`zone_risk.reason`), алерты с фильтром «для служб» (МЧС, муниципальные службы).
-- Статистика: всего, по уровням риска, за 7 дней, по дням (один SQL с `group by date_trunc('day', created_at)`),
-  счётчик для ЦУР «отчётов / выявлено рисков».
-- CSV-экспорт отчётов и алертов — на клиенте из уже загруженных данных (для модератора), с BOM для Excel.
+- Вход — Supabase Auth, только аккаунты из `moderators`; гард в UI для удобства, защита — в БД.
+- Список и карточка: точные координаты, `ai_triage`, похожие заявки, комментарий модератора, история статусов.
+- Смена статуса — RPC/функция с проверкой модератора; после смены обновляются карточка и карта.
+- Счётчики: новые, на проверке, повторяющиеся участки, среднее время до проверки (один SQL с `group by`).
+- CSV-экспорт — на клиенте из уже загруженных данных, с BOM для Excel.
 
 ## Тесты
-- SQL-проверки RLS в `supabase/tests/` (pgTAP) или скрипт с anon-клиентом: anon не видит точные координаты,
-  `api_key_hash`, не может `update`; модератор может.
+- `npm run verify:sql`: RLS, колоночные права, CHECK (категория, 500 символов, 300 м), история статусов, приватность view.
+- Юнит-тесты функций: валидация входа, лимиты, идемпотентность по `client_id`.

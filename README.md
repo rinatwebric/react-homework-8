@@ -1,10 +1,14 @@
 # SuuTech
 
-Мобильное PWA о риске подземного подтопления (Кыргызстан, пилот — село Ак-Өлөң, Иссык-Куль).
-Сигнал → риск зоны → предупреждение жителям → действия служб в `/admin`.
+Мобильное PWA о подтоплениях в селе (Кыргызстан, пилот — Ак-Өлөң, Иссык-Куль).
+Заявка жителя с геопозицией → карта проблем → срочность и статусы в `/admin` → предупреждения.
 
-> Полное ТЗ — [`docs/spec.md`](docs/spec.md), план срезов — [`docs/plan.md`](docs/plan.md),
-> журнал решений — [`docs/decisions.md`](docs/decisions.md), инструкции для агентов — [`AGENTS.md`](AGENTS.md).
+> ТЗ v2.0 — [`docs/spec.md`](docs/spec.md), план PR-1…PR-5 — [`docs/plan.md`](docs/plan.md),
+> журнал решений — [`docs/decisions.md`](docs/decisions.md), питч — [`docs/pitch.md`](docs/pitch.md),
+> инструкции для агентов — [`AGENTS.md`](AGENTS.md).
+>
+> Работа идёт по PR-1…PR-5 (`docs/plan.md`). Схема БД уже v2.0 (аддитивная миграция), интерфейс ещё
+> догоняет ТЗ: часть экранов v1.0 (`scanner`, `water`) удаляется в PR-5.
 
 ## Стек
 
@@ -35,13 +39,13 @@ npm run dev                  # http://localhost:5173
 
 ```
 src/app/        роутер, layout, error boundary, регистрация SW
-src/features/   home, scanner, map, water, admin
-src/shared/     ui/ (кнопки, карточки, состояния, бейдж и шкала риска), lib/ (i18n, risk, cx), types/
-src/config/     features.ts (флаги), pilot.ts (пилотная зона), risk.ts (уровни риска), demo.ts (демо-данные)
+src/features/   home, report, map, admin (v1.0: scanner, water — до PR-5)
+src/shared/     ui/ (кнопки, карточки, состояния, бейдж срочности), lib/ (i18n, cx), types/ (контракты, database)
+src/config/     features.ts (флаги), pilot.ts (пилотная зона), report.ts (категории/срочность), map.ts, ai.ts, demo.ts
 src/locales/    ru.json, ky.json
-supabase/       migrations/, config.toml
+supabase/       migrations/, functions/ (analyze-photo — v1.0, submit-report, _shared)
 scripts/        verify-migration.mjs
-docs/           spec.md, plan.md, decisions.md, deploy.md, AI_GUIDE.md
+docs/           spec.md, plan.md, decisions.md, pitch.md, deploy.md, AI_GUIDE.md
 ```
 
 ## Установка на телефон

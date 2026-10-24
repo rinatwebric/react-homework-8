@@ -5,7 +5,7 @@ description: SuuTech Web Push alerts (P1). Use when implementing VAPID keys, the
 
 # Web Push SuuTech
 
-Требования: `docs/spec.md` §7.2, §6.5. Для демо обязательна кнопка «Отправить тестовое предупреждение» в `/admin`.
+Требования: `docs/spec.md` §12. Для демо обязательна кнопка «Отправить тестовое предупреждение» в `/admin`.
 
 ## Ключи
 - Сгенерировать один раз: `npx web-push generate-vapid-keys`.
@@ -29,15 +29,16 @@ description: SuuTech Web Push alerts (P1). Use when implementing VAPID keys, the
 
 ## Сервер
 - `subscribe-push`: валидация zod, `upsert` по `endpoint`.
-- `send-push`: вызывается (а) из `/admin` — проверить JWT и что пользователь модератор; (б) из `compute-zone-risk` (переход зоны в `high`/`critical`) и `weather-check`/cron —
-  по секретному заголовку. Payload ≤ ~3 КБ.
+- `send-push`: вызывается (а) из `/admin` — проверить JWT и что пользователь модератор; (б) из `send-alert` —
+  по секретному заголовку. Автоматических источников (датчики, прогноз зоны) в MVP нет: предупреждение всегда
+  инициирует человек. Payload ≤ ~3 КБ.
 - Библиотека для Deno: `jsr:@negrel/webpush` (Node-пакет `web-push` в Deno Edge Runtime работает ненадёжно).
   Перед реализацией сверить API по README пакета (используй Context7 / WebFetch).
 - Ответ push-сервиса 404/410 → удалить подписку. Отправлять параллельно пачками (например по 20), считать
   успехи/ошибки и вернуть сводку `{ sent, failed, removed }` — её же показать в админке.
-- Получатели автоматических алертов — подписки с тем же `zone_id` (или `area_lat/lng` внутри зоны).
-- Каждое отправленное предупреждение пишется в `alerts` → баннер в приложении читает последние `alerts`
-  (это fallback, если push не дошёл).
+- Получатели предупреждения — подписки с тем же `zone_id` либо внутри выбранной `area` (`area_lat/lng`).
+- Каждое отправленное предупреждение пишется в `alerts` (`area`, `level`, `message`, `source`, `created_by`) →
+  баннер в приложении читает последние `alerts` (fallback, если push не дошёл).
 
 ## Проверка
 - Android Chrome: подписка → кнопка в админке → уведомление при свёрнутом приложении.
