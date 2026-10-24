@@ -1,9 +1,9 @@
 /**
  * client_id: UUID v4, стабильный на время работы экрана.
  *
- * Срез 1 — ключ идемпотентности и лимитов `analyze-photo`;
- * срез 2 — `reports.client_id` (повторная отправка формы не создаёт дубль).
- * Живёт в shared, потому что нужен и сканеру, и форме отчёта.
+ * Им помечается заявка (`reports.client_id`, ключ идемпотентности: повторная
+ * отправка формы не создаёт дубль) и папка необязательного фото в бакете
+ * `report-photos`. Живёт в shared, потому что нужен и форме, и загрузке фото.
  */
 export function createClientId(): string {
   if (typeof crypto.randomUUID === 'function') return crypto.randomUUID()

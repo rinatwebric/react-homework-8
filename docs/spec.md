@@ -143,7 +143,7 @@ AI только предлагает значения. Модератор мож
 - `ai_triage`: `report_id`, `category_ai`, `urgency_ai`, `summary`, `recommended_action`, `duplicate_group`, `confidence`, `needs_human_review`, `created_at`.
 - `alerts`: `id`, `created_at`, `area`, `level`, `message`, `source`, `created_by`.
 - `reports_public`: представление с округлёнными координатами, без приватных метаданных и служебных полей.
-- Поля v1.0 (`risk_level`, `findings`, `recommendations`, `water_in_basement`, `well_depth_m`, `mode`, `zone_risk`, `photo_assessments`) временно сохраняются в схеме и удаляются отдельным PR после перевода фронтенда, чтобы прод не ломался в процессе.
+- Поля v1.0 (`risk_level`, `findings`, `recommendations`, `water_in_basement`, `well_depth_m`, `mode`, `zone_risk`) временно сохраняются в схеме и удаляются отдельным PR после перевода фронтенда, чтобы прод не ломался в процессе. Таблица `photo_assessments` (кэш удалённой Edge Function `analyze-photo`) уже удалена миграцией `20261025120000_drop_photo_assessments.sql`.
 
 ## 15. План работ на 72 часа
 - Этап 0: PWA-каркас, деплой, Supabase, базовые таблицы и QR-код.

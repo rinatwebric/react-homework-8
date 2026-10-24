@@ -3,25 +3,28 @@
 Источник требований — `docs/spec.md` (ТЗ v2.0 от 24.10.2026). Здесь статус, порядок PR и то, что удаляется.
 Правило: не начинаем следующий этап, пока текущий не работает на телефоне.
 
-## Состояние на 24.10.2026
-- Репозиторий: `react-homework-8`, ветка `main`. `npm ci`, `typecheck`, `lint` (0 ошибок), `test` (156 тестов),
+## Состояние на 25.10.2026
+- Репозиторий: `react-homework-8`, ветка `main`. `npm ci`, `typecheck`, `lint` (0 ошибок), `test` (139 тестов),
   `build`, `dev :5173` — зелёные.
 - Прод: Supabase `ljwyrvyzvuxauylmtosp`, Vercel. Данные: `reports` = 0, `zone_risk` = 0, `alerts` = 0,
-  `photo_assessments` = 9 (тестовый кэш), `moderators` и `push_subscriptions` есть, бакет `report-photos` публичный.
-- Код всё ещё v1.0: AI-сканер для жителя, `risk_level`, датчики, фермер, Premium. Переписываем по этапам ниже.
+  `photo_assessments` удалена (миграция `20261025120000`), `moderators` и `push_subscriptions` есть,
+  бакет `report-photos` публичный.
+- Фронт на v2.0: заявка жителя (`/report`) в проде; старый AI-сканер (`/scan`) и раздел «Вода»
+  (`/water`) удалены вместе с `analyze-photo`. В коде ещё v1.0-хвосты: поле «риск» на карте, датчики,
+  фермер, Premium, `zone_risk`, legacy-колонки `reports`.
 
 ## Этапы ТЗ (§15) и PR
 | Этап ТЗ | Содержание | PR | Статус |
 |---|---|---|---|
 | — | Документы v2.0, скиллы, аддитивная миграция, контракты | **PR-1** `feat/tz-v2-docs-and-schema` | готово к ревью |
 | 0 | PWA-каркас, деплой, Supabase — уже есть от v1.0 | — | готово |
-| 1 | Форма без обязательного фото, категории, геопозиция с радиусом 300 м, карта пилота, плашка «не прогноз» | **PR-2** | форма готова, ждёт ревью |
+| 1 | Форма без обязательного фото, категории, геопозиция с радиусом 300 м, карта пилота, плашка «не прогноз» | **PR-2** | форма и `submit-report` в проде (`main`); карта пилота — следующим PR |
 | 2 | Офлайн-очередь заявок и автодосылка | **PR-3** | — |
 | 3 | Админка v2.0: список и карточка заявки, статусы и история | **PR-4** | — |
 | 4 | Погодный блок и `weather_snapshot` в заявке | **PR-3** | — |
 | 5 | AI-триаж в админке (`classify-report`), ручная корректировка | **PR-4** | — |
 | 6 | Кнопка 112, баннер/push предупреждения, кыргызские подписи | **PR-3** (112) / **PR-5** (push, ky) | — |
-| — | Очистка v1.0: сканер, датчики, `zone_risk`, `photo_assessments`, legacy-колонки | **PR-5** (после демо) | — |
+| — | Очистка v1.0: сканер, датчики, `zone_risk`, `photo_assessments`, legacy-колонки | **PR-5** | сканер, `/water` и `photo_assessments` удалены 25.10.2026; датчики, фермер, Premium, `zone_risk`, legacy-колонки — остаются |
 
 ## PR-1 — документы, скиллы, схема (готов к ревью)
 - [x] `docs/spec.md` переписан под ТЗ v2.0.
@@ -74,8 +77,17 @@
 
 ## PR-5 — предупреждения и очистка (после демо)
 - Web Push: подписки, VAPID, `send-push`/`subscribe-push`, баннер предупреждения.
-- Удаление v1.0: `analyze-photo`, `src/features/scanner`, `water`, режим фермера, Premium, `zone_risk`,
-  `photo_assessments`, legacy-колонки `reports` и `status = 'reviewed'` — только когда прод-фронт живёт на v2.0.
+- [x] Первый шаг очистки (2026-10-25): удалены Edge Function `analyze-photo` и её общий код
+      (`_shared/vision.ts`, `prompt.ts`, `ai-contract.ts`), экран `/scan` + `src/features/scanner`,
+      раздел «Вода» `/water` + `src/features/water`, таблица `photo_assessments`
+      (миграция `20261025120000_drop_photo_assessments.sql`), `src/config/ai.ts`, флаг
+      `VITE_FF_WATER_VOLUME`, пункты навигации и плитки, i18n-ключи `scan`/`water`, `docs/ai-test-photos.md`.
+      Фото осталось необязательным вложением заявки (`photo_path` + бакет `report-photos`).
+      Плитка «разместить фото» на `/map` ведёт на живой `/report` вместо удалённого `/scan`.
+- [ ] Осталось в PR-5: режим фермера, Premium, `zone_risk`, legacy-колонки `reports`
+      (`risk_level`, `confidence`, `findings`, `recommendations`, `water_in_basement`, `well_depth_m`,
+      `mode`, `photo_sha256`), `status = 'reviewed'`, показ риска v1.0 на карте — только когда
+      карта перестанет их читать.
 - `docs/pitch.md` и сценарий демо синхронизируются с фактическим UI.
 
 ## Риски и как их снимаем

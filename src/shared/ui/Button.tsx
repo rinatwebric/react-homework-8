@@ -51,7 +51,7 @@ export type ButtonLinkProps = {
   className?: string
   /** Подпись, если внутри только иконка. */
   ariaLabel?: string
-  /** Контекст перехода (react-router): например, результат сканера для формы отчёта. */
+  /** Контекст перехода (react-router): например, фото, приложенное к заявке. */
   state?: unknown
 }
 

@@ -39,11 +39,11 @@ npm run dev                  # http://localhost:5173
 
 ```
 src/app/        роутер, layout, error boundary, регистрация SW
-src/features/   home, report, map, admin (v1.0: scanner, water — до PR-5)
+src/features/   home, report, map, admin (v1.0 scanner и water удалены, PR-5)
 src/shared/     ui/ (кнопки, карточки, состояния, бейдж срочности), lib/ (i18n, cx), types/ (контракты, database)
-src/config/     features.ts (флаги), pilot.ts (пилотная зона), report.ts (категории/срочность), map.ts, ai.ts, demo.ts
+src/config/     features.ts (флаги), pilot.ts (пилотная зона), report.ts (категории/срочность), map.ts, demo.ts
 src/locales/    ru.json, ky.json
-supabase/       migrations/, functions/ (analyze-photo — v1.0, submit-report, _shared)
+supabase/       migrations/, functions/ (submit-report, _shared)
 scripts/        verify-migration.mjs
 docs/           spec.md, plan.md, decisions.md, pitch.md, deploy.md, AI_GUIDE.md
 ```

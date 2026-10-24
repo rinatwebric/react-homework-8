@@ -12,7 +12,6 @@ export const features = {
   farmer: readFlag(import.meta.env.VITE_FF_FARMER),
   premium: readFlag(import.meta.env.VITE_FF_PREMIUM),
   kyrgyz: readFlag(import.meta.env.VITE_FF_KYRGYZ),
-  waterVolume: readFlag(import.meta.env.VITE_FF_WATER_VOLUME),
 } as const
 
 export type FeatureName = keyof typeof features

@@ -1,17 +1,16 @@
 /**
- * Оболочка приложения: контент + нижняя навигация с четырьмя разделами (макет).
+ * Оболочка приложения: контент + нижняя навигация по разделам v2.0
+ * (главная и карта; заявка — CTA на главной).
  * Mobile-first: телефон — основная ширина, на десктопе контент по центру.
  */
-import { Droplet, Home, MapPin, ScanLine } from 'lucide-react'
+import { Home, MapPin } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { NavLink, Outlet } from 'react-router-dom'
 import { cx } from '../shared/lib/cx'
 
 const NAV_ITEMS = [
   { to: '/', labelKey: 'nav.home', icon: Home, end: true },
-  { to: '/scan', labelKey: 'nav.scan', icon: ScanLine, end: false },
   { to: '/map', labelKey: 'nav.map', icon: MapPin, end: false },
-  { to: '/water', labelKey: 'nav.water', icon: Droplet, end: false },
 ] as const
 
 export function Layout() {

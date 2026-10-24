@@ -12,7 +12,6 @@ interface ImportMetaEnv {
   readonly VITE_FF_FARMER?: string
   readonly VITE_FF_PREMIUM?: string
   readonly VITE_FF_KYRGYZ?: string
-  readonly VITE_FF_WATER_VOLUME?: string
 }
 
 interface ImportMeta {

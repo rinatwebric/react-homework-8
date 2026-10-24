@@ -30,9 +30,9 @@ import { SubmitReportError, submitReport, type SubmitReportErrorCode } from './l
  * Срез 2, PR-2: заявка жителя v2.0 (§7).
  *
  * Обязательно: категория и координаты (GPS или пин в радиусе 300 м от GPS).
- * Необязательно: комментарий до 500 символов, фото из сканера, отметка
- * «опасно для жизни». AI-оценка фото в заявку не входит — она нужна только
- * модератору (§8), поэтому и на форму не выводится.
+ * Необязательно: комментарий до 500 символов, фото с карты (или из галереи),
+ * отметка «опасно для жизни». AI-оценка фото в заявку не входит — она нужна
+ * только модератору (§8), поэтому и на форму не выводится.
  *
  * Все записи — только через Edge Function `submit-report` v4: у anon нет INSERT
  * в reports.
@@ -43,7 +43,7 @@ export function ReportPage() {
   const photo = useMemo(() => readReportContext(routeLocation.state), [routeLocation.state])
 
   const { state: geo, refining, locate, setManualPoint, availability } = useGeolocation()
-  // client_id сканера становится id заявки: фото уже лежит в его папке.
+  // client_id приходит с карты: фото уже лежит в его папке в бакете.
   const [clientId] = useState(() => photo?.clientId ?? createClientId())
   const [deviceHash, setDeviceHash] = useState<string | null>(null)
   const [category, setCategory] = useState<ReportCategory | null>(null)

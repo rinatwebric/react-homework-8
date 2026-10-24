@@ -20,17 +20,6 @@ export const DEMO_MAP: {
   legend: ['normal', 'elevated', 'high'],
 }
 
-/** Уровень воды по дням, 0…1 — высота столбика. */
-export const DEMO_WATER_WEEK = [
-  { day: 'mon', value: 0.42 },
-  { day: 'tue', value: 0.5 },
-  { day: 'wed', value: 0.56 },
-  { day: 'thu', value: 0.74 },
-  { day: 'fri', value: 0.68 },
-  { day: 'sat', value: 0.44 },
-  { day: 'sun', value: 0.38 },
-] as const
-
 /** Сводка для /admin: реальные цифры появятся после среза 4. */
 export const DEMO_ADMIN: {
   stats: readonly { id: 'reports' | 'zones' | 'roads' | 'wells'; value: number }[]
