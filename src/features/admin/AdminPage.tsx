@@ -183,9 +183,6 @@ export default function AdminPage() {
             <Link to="/" className="text-xl font-extrabold tracking-tight">
               SuuTech
             </Link>
-            <span className="rounded-md border border-brand-bright/40 bg-brand-bright/20 px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase text-brand-bright">
-              Панель службы
-            </span>
           </div>
 
           <p className="mt-1 text-xs text-on-ink/60">

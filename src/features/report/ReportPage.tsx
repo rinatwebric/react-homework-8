@@ -15,7 +15,7 @@ import type { WeatherSnapshot } from '../../shared/types/report-contract'
 import { useWeather } from '../weather/hooks/useWeather'
 import { CategoryPicker } from './components/CategoryPicker'
 import { CommentField } from './components/CommentField'
-import { RiskLevelSelector } from './components/RiskLevelSelector'
+import { RiskLevelSelector, type ResidentRiskSeverity } from './components/RiskLevelSelector'
 import { LocationSection } from './components/LocationSection'
 import { PhotoField } from './components/PhotoField'
 import { ReportSent } from './components/ReportSent'
@@ -50,6 +50,7 @@ export function ReportPage() {
   const [photoPath, setPhotoPath] = useState<string | null>(() => routePhoto?.photoPath ?? null)
   const [deviceHash, setDeviceHash] = useState<string | null>(null)
   const [category, setCategory] = useState<ReportCategory | null>(null)
+  const [riskSeverity, setRiskSeverity] = useState<ResidentRiskSeverity>('moderate')
   const [comment, setComment] = useState('')
   const [immediateDanger, setImmediateDanger] = useState(false)
   const [submitting, setSubmitting] = useState(false)
@@ -90,6 +91,11 @@ export function ReportPage() {
       active = false
     }
   }, [])
+
+  const handleRiskChange = (sev: ResidentRiskSeverity) => {
+    setRiskSeverity(sev)
+    setImmediateDanger(sev === 'critical')
+  }
 
   const draft: ReportDraft = useMemo(
     () => ({
@@ -202,8 +208,8 @@ export function ReportPage() {
 
       <Card className="space-y-4 p-4">
         <RiskLevelSelector
-          value={immediateDanger}
-          onDangerChange={setImmediateDanger}
+          severity={riskSeverity}
+          onSelect={handleRiskChange}
         />
         <CommentField value={comment} onChange={setComment} />
       </Card>
