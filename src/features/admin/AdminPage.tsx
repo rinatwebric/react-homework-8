@@ -110,6 +110,16 @@ export default function AdminPage() {
     return filterReports(reports, opts)
   }, [reports, statusFilter, categoryFilter, dangerOnly, highRiskOnly, searchQuery])
 
+  // Уведомления из вкладки алертов
+  const handleAlertNotify = useCallback(
+    (type: 'success' | 'error' | 'info', title: string, message?: string) => {
+      if (type === 'success') showSuccess(title, message)
+      else if (type === 'error') showError(title, message)
+      else showInfo(title, message)
+    },
+    [showSuccess, showError, showInfo],
+  )
+
   // Обновление одной заявки в состоянии
   const handleReportUpdated = (updated: ReportWithTriage) => {
     setReports((prev) => prev.map((r) => (r.id === updated.id ? updated : r)))
@@ -315,13 +325,7 @@ export default function AdminPage() {
           </div>
 
           {activeTab === 'alerts' ? (
-            <AdminAlertsTab
-              onNotify={(type, title, message) => {
-                if (type === 'success') showSuccess(title, message)
-                else if (type === 'error') showError(title, message)
-                else showInfo(title, message)
-              }}
-            />
+            <AdminAlertsTab onNotify={handleAlertNotify} />
           ) : (
             <>
               {/* Плашка ошибки загрузки */}

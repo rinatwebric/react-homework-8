@@ -66,13 +66,25 @@ export async function fetchAllAlerts(token?: string | null): Promise<AlertItem[]
   const url = `${supabaseConfig.url.replace(/\/+$/, '')}/rest/v1/alerts?order=created_at.desc&limit=50`
 
   try {
-    const res = await fetch(url, {
+    let res = await fetch(url, {
       headers: {
         apikey: supabaseConfig.anonKey,
         Authorization: `Bearer ${effectiveToken}`,
         Accept: 'application/json',
       },
     })
+
+    // Если токен модератора истёк или недействителен (401), пробуем с публичным anon-ключом
+    if (res.status === 401 && effectiveToken !== supabaseConfig.anonKey) {
+      console.warn('[alerts-api] Токен модератора недействителен (401), пробуем с anon-ключом')
+      res = await fetch(url, {
+        headers: {
+          apikey: supabaseConfig.anonKey,
+          Authorization: `Bearer ${supabaseConfig.anonKey}`,
+          Accept: 'application/json',
+        },
+      })
+    }
 
     if (!res.ok) {
       throw new Error(`Ошибка загрузки предупреждений: ${res.status}`)

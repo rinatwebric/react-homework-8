@@ -6,7 +6,7 @@ import {
   RefreshCw,
   Send,
 } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { createAlert, fetchAllAlerts } from '../../alerts/alerts-api'
 import type { AlertItem, AlertLevel } from '../../alerts/types'
@@ -65,6 +65,12 @@ export function AdminAlertsTab({ onNotify }: AdminAlertsTabProps) {
     }
   }
 
+  // Храним onNotify в ref, чтобы исключить каскадные ре-рендеры и зацикливание вызовов
+  const onNotifyRef = useRef(onNotify)
+  useEffect(() => {
+    onNotifyRef.current = onNotify
+  })
+
   const loadAlerts = useCallback(async () => {
     setIsLoading(true)
     try {
@@ -73,11 +79,11 @@ export function AdminAlertsTab({ onNotify }: AdminAlertsTabProps) {
       setAlerts(data)
     } catch (err) {
       console.warn('[admin-alerts] Ошибка загрузки истории:', err)
-      onNotify('error', t('admin.alerts.loadError', 'Ошибка загрузки предупреждений'))
+      onNotifyRef.current('error', t('admin.alerts.loadError', 'Ошибка загрузки предупреждений'))
     } finally {
       setIsLoading(false)
     }
-  }, [onNotify, t])
+  }, [t])
 
   useEffect(() => {
     void loadAlerts()

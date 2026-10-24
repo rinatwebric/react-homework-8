@@ -1,6 +1,13 @@
-import { describe, expect, it } from 'vitest'
-import { sortAlertsBySeverity } from './alerts-api'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { fetchAllAlerts, sortAlertsBySeverity } from './alerts-api'
 import { alertItemSchema, type AlertItem } from './types'
+
+vi.mock('../../shared/lib/supabase', () => ({
+  supabaseConfig: {
+    url: 'https://test-project.supabase.co',
+    anonKey: 'anon-key-test-1234567890abcdef',
+  },
+}))
 
 describe('alerts parsing & sorting', () => {
   it('alertItemSchema нормализует уровни и валидирует поля', () => {
@@ -70,5 +77,42 @@ describe('alerts parsing & sorting', () => {
 
     const sorted = sortAlertsBySeverity(alerts)
     expect(sorted.map((a) => a.id)).toEqual(['4', '2', '3', '1'])
+  })
+})
+
+describe('fetchAllAlerts: загрузка и устойчивость к 401', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('при 401 на токене модератора автоматически пробует anon-ключ', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+      // Первый запрос с токеном возвращает 401
+      .mockResolvedValueOnce({
+        status: 401,
+        ok: false,
+      } as Response)
+      // Второй запрос с anonKey успешен
+      .mockResolvedValueOnce({
+        status: 200,
+        ok: true,
+        json: async () => [
+          {
+            id: 'alert-retried-1',
+            level: 'warning',
+            message: 'Внимание',
+            created_at: '2026-10-25T01:00:00Z',
+          },
+        ],
+      } as Response)
+
+    const result = await fetchAllAlerts('expired-token-jwt')
+    expect(result.length).toBe(1)
+    expect(result[0]?.id).toBe('alert-retried-1')
+    expect(fetchSpy).toHaveBeenCalledTimes(2)
   })
 })

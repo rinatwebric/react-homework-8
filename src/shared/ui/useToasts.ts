@@ -6,8 +6,14 @@ export function useToasts() {
   const [toasts, setToasts] = useState<ToastItem[]>([])
 
   const addToast = useCallback((type: ToastType, title: string, message?: string) => {
-    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
-    setToasts((prev) => [...prev, { id, type, title, message }])
+    setToasts((prev) => {
+      // Защита от спама: не добавляем тост, если такой же уже отображается
+      const isDuplicate = prev.some((t) => t.type === type && t.title === title)
+      if (isDuplicate) return prev
+
+      const id = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+      return [...prev.slice(-3), { id, type, title, message }]
+    })
   }, [])
 
   const dismissToast = useCallback((id: string) => {
