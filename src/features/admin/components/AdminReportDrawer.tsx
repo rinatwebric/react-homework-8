@@ -85,9 +85,20 @@ export function AdminReportDrawer({
 
   const weather = report.weather_snapshot as {
     temp_c?: number
+    temperature_c?: number
     precip_mm?: number
+    precipitation_mm?: number
     humidity?: number
+    humidity_pct?: number
   } | null
+
+  const tempVal = weather?.temperature_c ?? weather?.temp_c
+  const precipVal = weather?.precipitation_mm ?? weather?.precip_mm
+
+  const isCriticalRisk =
+    report.immediate_danger || (report.comment ?? '').includes('[Критический')
+  const isHighRisk = (report.comment ?? '').includes('[Высокий')
+  const isModerateRisk = (report.comment ?? '').includes('[Умеренный')
 
   // Обработчик сохранения статуса
   const handleSaveStatus = async () => {
@@ -186,12 +197,21 @@ export function AdminReportDrawer({
               <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 {t('admin.drawer.citizenData', 'Данные жителя')}
               </h3>
-              {report.immediate_danger && (
+              {isCriticalRisk ? (
                 <span className="flex items-center gap-1 rounded-md border border-rose-300 bg-rose-50 px-2 py-0.5 text-xs font-bold text-rose-700 animate-pulse">
                   <AlertTriangle className="size-3.5" />
-                  {t('admin.drawer.dangerWarning', 'Опасность для жизни (112)')}
+                  Критический риск (112)
                 </span>
-              )}
+              ) : isHighRisk ? (
+                <span className="flex items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-bold text-amber-800">
+                  <AlertTriangle className="size-3.5" />
+                  Высокий риск
+                </span>
+              ) : isModerateRisk ? (
+                <span className="flex items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-800">
+                  Умеренный риск
+                </span>
+              ) : null}
             </div>
 
             {/* Категория жителя */}
@@ -239,13 +259,13 @@ export function AdminReportDrawer({
                 <div className="flex items-center gap-1.5">
                   <Thermometer className="size-4 text-brand-deep" />
                   <span>
-                    {weather.temp_c != null ? `${weather.temp_c}°C` : 'н/д'}
+                    {tempVal != null ? `${tempVal}°C` : 'н/д'}
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <CloudRain className="size-4 text-blue-600" />
                   <span>
-                    {weather.precip_mm != null ? `${weather.precip_mm} мм` : '0 мм'}
+                    {precipVal != null ? `${precipVal} мм` : '0 мм'}
                   </span>
                 </div>
                 {weather.humidity != null && (

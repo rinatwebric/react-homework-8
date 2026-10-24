@@ -72,8 +72,17 @@ export function AdminReportList({
 
         const weather = report.weather_snapshot as {
           temp_c?: number
+          temperature_c?: number
           precip_mm?: number
+          precipitation_mm?: number
         } | null
+
+        const tempVal = weather?.temperature_c ?? weather?.temp_c
+        const precipVal = weather?.precipitation_mm ?? weather?.precip_mm
+
+        const isCriticalRisk =
+          report.immediate_danger || (report.comment ?? '').includes('[Критический')
+        const isHighRisk = (report.comment ?? '').includes('[Высокий')
 
         return (
           <div
@@ -113,16 +122,24 @@ export function AdminReportList({
                   </span>
                 )}
 
-                {/* Непосредственная опасность */}
-                {report.immediate_danger && (
+                {/* Непосредственная опасность или высокий риск */}
+                {isCriticalRisk ? (
                   <span
                     className="flex items-center gap-1 rounded-md border border-rose-300 bg-rose-50 px-1.5 py-0.5 text-[11px] font-bold text-rose-700 animate-pulse"
-                    title={t('admin.list.dangerAlert', 'Непосредственная опасность жителю/дому!')}
+                    title={t('admin.list.dangerAlert', 'Критическая опасность / ЧС!')}
                   >
                     <AlertTriangle className="size-3" />
-                    112
+                    Критический риск
                   </span>
-                )}
+                ) : isHighRisk ? (
+                  <span
+                    className="flex items-center gap-1 rounded-md border border-amber-300 bg-amber-50 px-1.5 py-0.5 text-[11px] font-bold text-amber-800"
+                    title="Высокий риск подтопления"
+                  >
+                    <AlertTriangle className="size-3" />
+                    Высокий риск
+                  </span>
+                ) : null}
 
                 {/* Индикатор фото */}
                 {report.photo_path && (
@@ -169,11 +186,11 @@ export function AdminReportList({
                 {weather && (
                   <span className="flex items-center gap-1 text-[11px]">
                     <Thermometer className="size-3 text-brand-deep" />
-                    {weather.temp_c != null ? `${weather.temp_c}°C` : ''}
-                    {weather.precip_mm != null && weather.precip_mm > 0 && (
+                    {tempVal != null ? `${tempVal}°C` : ''}
+                    {precipVal != null && precipVal > 0 && (
                       <span className="flex items-center gap-0.5 text-blue-600">
                         <CloudRain className="size-3 ml-1" />
-                        {weather.precip_mm} мм
+                        {precipVal} мм
                       </span>
                     )}
                   </span>

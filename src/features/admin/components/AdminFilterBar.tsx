@@ -14,6 +14,8 @@ interface AdminFilterBarProps {
   onCategoryChange: (category: ReportCategory | 'all') => void
   dangerOnly: boolean
   onDangerOnlyChange: (val: boolean) => void
+  highRiskOnly: boolean
+  onHighRiskOnlyChange: (val: boolean) => void
   search: string
   onSearchChange: (search: string) => void
   totalCount: number
@@ -27,6 +29,8 @@ export function AdminFilterBar({
   onCategoryChange,
   dangerOnly,
   onDangerOnlyChange,
+  highRiskOnly,
+  onHighRiskOnlyChange,
   search,
   onSearchChange,
   totalCount,
@@ -38,12 +42,14 @@ export function AdminFilterBar({
     status !== 'all' ||
     category !== 'all' ||
     dangerOnly ||
+    highRiskOnly ||
     Boolean(search)
 
   const handleResetFilters = () => {
     onStatusChange('all')
     onCategoryChange('all')
     onDangerOnlyChange(false)
+    onHighRiskOnlyChange(false)
     onSearchChange('')
   }
 
@@ -90,7 +96,7 @@ export function AdminFilterBar({
       </div>
 
       {/* Селекторы */}
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
         {/* Фильтр по статусу */}
         <div>
           <label className="mb-1 block text-[11px] font-semibold uppercase text-muted-foreground">
@@ -130,6 +136,22 @@ export function AdminFilterBar({
           </select>
         </div>
 
+        {/* Чекбокс Только высокий / критический риск */}
+        <div className="flex items-end">
+          <label className="flex h-8 w-full cursor-pointer items-center gap-2 rounded-xl border border-border bg-background px-3 text-xs font-medium text-ink select-none hover:bg-muted/40">
+            <input
+              type="checkbox"
+              checked={highRiskOnly}
+              onChange={(e) => onHighRiskOnlyChange(e.target.checked)}
+              className="size-3.5 accent-amber-600"
+            />
+            <span className="flex items-center gap-1 truncate text-amber-700 font-semibold">
+              <AlertTriangle className="size-3 shrink-0" />
+              Высокий риск
+            </span>
+          </label>
+        </div>
+
         {/* Чекбокс Только с опасностью (112) */}
         <div className="flex items-end">
           <label className="flex h-8 w-full cursor-pointer items-center gap-2 rounded-xl border border-border bg-background px-3 text-xs font-medium text-ink select-none hover:bg-muted/40">
@@ -141,7 +163,7 @@ export function AdminFilterBar({
             />
             <span className="flex items-center gap-1 truncate text-rose-700 font-semibold">
               <AlertTriangle className="size-3 shrink-0" />
-              {t('admin.filters.dangerOnly', 'Только с угрозой (112)')}
+              {t('admin.filters.dangerOnly', 'Только 112')}
             </span>
           </label>
         </div>

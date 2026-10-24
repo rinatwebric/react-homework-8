@@ -43,6 +43,7 @@ export interface ReportFilterOptions {
   status?: ReportStatus | 'all'
   category?: ReportCategory | 'all'
   dangerOnly?: boolean
+  highRiskOnly?: boolean
   search?: string
   urgency?: UrgencyLevel | 'all'
   needsReviewOnly?: boolean
@@ -58,6 +59,7 @@ export function filterReports(
     status = 'all',
     category = 'all',
     dangerOnly = false,
+    highRiskOnly = false,
     search = '',
     urgency = 'all',
     needsReviewOnly = false,
@@ -70,6 +72,15 @@ export function filterReports(
     if (status !== 'all' && r.status !== status) return false
     if (category !== 'all' && r.category_user !== category) return false
     if (dangerOnly && !r.immediate_danger) return false
+    if (highRiskOnly) {
+      const isCriticalOrHigh =
+        r.immediate_danger ||
+        (r.comment ?? '').includes('[Высокий риск]') ||
+        (r.comment ?? '').includes('[Критический риск') ||
+        r.ai_triage?.urgency_ai === 'high' ||
+        r.ai_triage?.urgency_ai === 'critical'
+      if (!isCriticalOrHigh) return false
+    }
     if (urgency !== 'all' && r.ai_triage?.urgency_ai !== urgency) return false
     if (needsReviewOnly && !r.ai_triage?.needs_human_review) return false
     if (duplicateGroup && r.ai_triage?.duplicate_group !== duplicateGroup) return false

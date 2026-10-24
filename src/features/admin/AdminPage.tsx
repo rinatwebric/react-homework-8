@@ -57,6 +57,7 @@ export default function AdminPage() {
   const [statusFilter, setStatusFilter] = useState<ReportStatus | 'all'>('all')
   const [categoryFilter, setCategoryFilter] = useState<ReportCategory | 'all'>('all')
   const [dangerOnly, setDangerOnly] = useState<boolean>(false)
+  const [highRiskOnly, setHighRiskOnly] = useState<boolean>(false)
   const [searchQuery, setSearchQuery] = useState<string>('')
 
   // Функция загрузки данных с автологином демо-модератора
@@ -103,10 +104,11 @@ export default function AdminPage() {
       status: statusFilter,
       category: categoryFilter,
       dangerOnly,
+      highRiskOnly,
       search: searchQuery,
     }
     return filterReports(reports, opts)
-  }, [reports, statusFilter, categoryFilter, dangerOnly, searchQuery])
+  }, [reports, statusFilter, categoryFilter, dangerOnly, highRiskOnly, searchQuery])
 
   // Обновление одной заявки в состоянии
   const handleReportUpdated = (updated: ReportWithTriage) => {
@@ -351,6 +353,8 @@ export default function AdminPage() {
                 onCategoryChange={setCategoryFilter}
                 dangerOnly={dangerOnly}
                 onDangerOnlyChange={setDangerOnly}
+                highRiskOnly={highRiskOnly}
+                onHighRiskOnlyChange={setHighRiskOnly}
                 search={searchQuery}
                 onSearchChange={setSearchQuery}
                 totalCount={reports.length}
