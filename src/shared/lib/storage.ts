@@ -4,6 +4,15 @@
 import { supabaseConfig } from './supabase'
 
 /**
+ * Получение публичной ссылки на фотографию заявки в бакете `report-photos`.
+ */
+export function getReportPhotoUrl(photoPath: string | null | undefined): string | null {
+  if (!photoPath || !supabaseConfig) return null
+  const cleanPath = photoPath.replace(/^\/+/, '')
+  return `${supabaseConfig.url.replace(/\/+$/, '')}/storage/v1/object/public/report-photos/${cleanPath}`
+}
+
+/**
  * Загружает сжатое фото в бакет `report-photos`.
  * Путь создаётся строго в папке `client_id` (например `${clientId}/photo-${Date.now()}.jpg`),
  * что удовлетворяет CHECK-констрейнту `reports_photo_belongs_to_client`.

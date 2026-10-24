@@ -1,122 +1,341 @@
-import { FileText, Inbox, MapPin, Radio, Waves } from 'lucide-react'
-import { useState } from 'react'
+import {
+  Download,
+  LogOut,
+  MapPin,
+  RefreshCw,
+  Shield,
+} from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import { DEMO_ADMIN } from '../../config/demo'
+import type { ReportCategory, UrgencyLevel } from '../../shared/lib/categories'
 import { cx } from '../../shared/lib/cx'
-import { Banner } from '../../shared/ui/Banner'
 import { Button } from '../../shared/ui/Button'
-import { Card } from '../../shared/ui/Card'
 import { DemoTag } from '../../shared/ui/DemoTag'
-import { RiskBadge } from '../../shared/ui/RiskBadge'
-import { MapPreview } from '../map/MapPreview'
+import type { ReportStatus, ReportWithTriage } from '../../shared/types/database'
+import {
+  clearModeratorSession,
+  fetchAdminReports,
+  getStoredModeratorEmail,
+  getStoredModeratorToken,
+} from './admin-api'
+import {
+  calculateAdminKpi,
+  filterReports,
+  type ReportFilterOptions,
+} from './admin-utils'
+import { AdminFilterBar } from './components/AdminFilterBar'
+import { AdminKpiCards } from './components/AdminKpiCards'
+import { AdminLoginDialog } from './components/AdminLoginDialog'
+import { AdminReportDrawer } from './components/AdminReportDrawer'
+import { AdminReportList } from './components/AdminReportList'
 
-const NAV = [
-  { id: 'map', icon: MapPin },
-  { id: 'reports', icon: Inbox },
-  { id: 'sensors', icon: Radio },
-  { id: 'drains', icon: Waves },
-  { id: 'export', icon: FileText },
-] as const
-
-/**
- * Срез 4: вход модератора (Supabase Auth), очередь отчётов, действия служб.
- * Пока — десктопная оболочка панели на демо-данных (макет 5): сайдбар + сводка + карта.
- */
 export default function AdminPage() {
   const { t } = useTranslation()
-  const [exportNote, setExportNote] = useState(false)
+
+  // Состояние авторизации
+  const [moderatorEmail, setModeratorEmail] = useState<string | null>(getStoredModeratorEmail())
+  const [showLoginDialog, setShowLoginDialog] = useState<boolean>(!getStoredModeratorToken())
+
+  // Загрузка данных
+  const [reports, setReports] = useState<ReportWithTriage[]>([])
+  const [isLoading, setIsLoading] = useState<boolean>(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+
+  // Выбранная заявка для просмотра
+  const [selectedReport, setSelectedReport] = useState<ReportWithTriage | null>(null)
+
+  // Состояние фильтрации
+  const [statusFilter, setStatusFilter] = useState<ReportStatus | 'all'>('all')
+  const [urgencyFilter, setUrgencyFilter] = useState<UrgencyLevel | 'all'>('all')
+  const [categoryFilter, setCategoryFilter] = useState<ReportCategory | 'all'>('all')
+  const [needsReviewOnly, setNeedsReviewOnly] = useState<boolean>(false)
+  const [searchQuery, setSearchQuery] = useState<string>('')
+  const [duplicateGroupFilter, setDuplicateGroupFilter] = useState<string | null>(null)
+
+  // Функция загрузки данных
+  const loadData = useCallback(async () => {
+    setIsLoading(true)
+    setLoadError(null)
+
+    try {
+      const data = await fetchAdminReports()
+      setReports(data)
+    } catch (err) {
+      console.warn('[admin] Ошибка загрузки заявок:', err)
+      setLoadError(err instanceof Error ? err.message : 'Не удалось загрузить заявки')
+    } finally {
+      setIsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
+
+  // Расчёт KPI
+  const kpiStats = useMemo(() => calculateAdminKpi(reports), [reports])
+
+  // Фильтрованный список заявок
+  const filteredReports = useMemo(() => {
+    const opts: ReportFilterOptions = {
+      status: statusFilter,
+      urgency: urgencyFilter,
+      category: categoryFilter,
+      needsReviewOnly,
+      search: searchQuery,
+      duplicateGroup: duplicateGroupFilter,
+    }
+    return filterReports(reports, opts)
+  }, [reports, statusFilter, urgencyFilter, categoryFilter, needsReviewOnly, searchQuery, duplicateGroupFilter])
+
+  // Обновление одной заявки в состоянии после изменения статуса или триажа
+  const handleReportUpdated = (updated: ReportWithTriage) => {
+    setReports((prev) => prev.map((r) => (r.id === updated.id ? updated : r)))
+    setSelectedReport(updated)
+  }
+
+  // Экспорт в CSV с BOM для Excel (§12)
+  const handleExportCsv = () => {
+    if (filteredReports.length === 0) return
+
+    const headers = [
+      'ID',
+      'Дата',
+      'Статус',
+      'Категория жителя',
+      'Комментарий',
+      'Опасность',
+      'Широта (lat)',
+      'Долгота (lng)',
+      'AI Категория',
+      'AI Срочность',
+      'AI Уверенность',
+      'AI Резюме',
+      'AI Действие',
+      'AI Группа дубликатов',
+      'Заметка модератора',
+    ]
+
+    const escapeCsv = (val: unknown) => {
+      if (val == null) return '""'
+      const str = String(val).replace(/"/g, '""')
+      return `"${str}"`
+    }
+
+    const rows = filteredReports.map((r) => [
+      escapeCsv(r.id),
+      escapeCsv(r.created_at),
+      escapeCsv(r.status),
+      escapeCsv(r.category_user ?? ''),
+      escapeCsv(r.comment ?? ''),
+      escapeCsv(r.immediate_danger ? 'ДА' : 'НЕТ'),
+      escapeCsv(r.lat ?? ''),
+      escapeCsv(r.lng ?? ''),
+      escapeCsv(r.ai_triage?.category_ai ?? ''),
+      escapeCsv(r.ai_triage?.urgency_ai ?? ''),
+      escapeCsv(r.ai_triage?.confidence != null ? `${Math.round(r.ai_triage.confidence * 100)}%` : ''),
+      escapeCsv(r.ai_triage?.summary ?? ''),
+      escapeCsv(r.ai_triage?.recommended_action ?? ''),
+      escapeCsv(r.ai_triage?.duplicate_group ?? ''),
+      escapeCsv(r.moderator_note ?? ''),
+    ])
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((row) => row.join(','))].join('\r\n')
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = `suutech-reports-${new Date().toISOString().slice(0, 10)}.csv`
+    link.click()
+    URL.revokeObjectURL(link.href)
+  }
+
+  const handleLogout = () => {
+    clearModeratorSession()
+    setModeratorEmail(null)
+    setShowLoginDialog(true)
+  }
 
   return (
-    <div className="flex min-h-dvh flex-col md:flex-row">
-      <aside className="bg-ink text-on-ink md:sticky md:top-0 md:h-dvh md:w-60 md:shrink-0 md:py-6">
-        <div className="flex items-center justify-between gap-3 px-4 pt-4 md:px-6 md:pt-0">
-          <Link to="/" className="text-xl font-extrabold tracking-tight">
-            SuuTech
-          </Link>
-          <Link to="/" className="text-xs font-medium text-on-ink/70 md:hidden">
-            {t('states.home')}
-          </Link>
+    <div className="flex min-h-dvh flex-col md:flex-row bg-background">
+      {/* Сайдбар */}
+      <aside className="bg-ink text-on-ink md:sticky md:top-0 md:h-dvh md:w-64 md:shrink-0 md:flex md:flex-col md:justify-between p-4 md:p-6">
+        <div>
+          <div className="flex items-center justify-between gap-3">
+            <Link to="/" className="text-xl font-extrabold tracking-tight">
+              SuuTech
+            </Link>
+            <span className="rounded-md border border-brand-bright/40 bg-brand-bright/20 px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase text-brand-bright">
+              Admin v2.0
+            </span>
+          </div>
+
+          <p className="mt-1 text-xs text-on-ink/60">
+            {t('admin.sidebarSubtitle', 'Панель модератора пилота')}
+          </p>
+
+          <nav className="mt-6 space-y-1.5">
+            <div className="flex items-center gap-2 rounded-xl bg-brand-deep px-3 py-2 text-sm font-semibold text-white">
+              <Shield className="size-4" />
+              {t('admin.navReports', 'Очередь заявок')}
+            </div>
+
+            <Link
+              to="/map"
+              className="flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium text-on-ink/75 hover:bg-on-ink/10 transition-colors"
+            >
+              <MapPin className="size-4" />
+              {t('admin.navMap', 'Карта пилота')}
+            </Link>
+          </nav>
         </div>
 
-        <nav
-          aria-label={t('admin.navLabel')}
-          className="mt-3 flex gap-1 overflow-x-auto px-3 pb-3 md:mt-8 md:flex-col md:gap-1.5 md:overflow-visible md:px-3 md:pb-0"
-        >
-          {NAV.map(({ id, icon: Icon }, index) => (
-            <span
-              key={id}
-              title={t('admin.demoNote')}
-              className={cx(
-                'flex min-h-11 shrink-0 items-center gap-2 rounded-xl px-3 text-sm font-medium',
-                index === 0 ? 'bg-brand-bright text-white' : 'text-on-ink/75',
-              )}
+        {/* Профиль и выход */}
+        <div className="mt-6 border-t border-on-ink/10 pt-4">
+          {moderatorEmail ? (
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-[10px] uppercase font-bold text-on-ink/50">Модератор</p>
+                <p className="truncate text-xs font-semibold text-on-ink/90">{moderatorEmail}</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="rounded-lg p-1.5 text-on-ink/60 hover:bg-on-ink/10 hover:text-on-ink"
+                title={t('admin.logout', 'Выйти')}
+              >
+                <LogOut className="size-4" />
+              </button>
+            </div>
+          ) : (
+            <Button
+              variant="outline"
+              size="md"
+              onClick={() => setShowLoginDialog(true)}
+              className="w-full text-xs"
             >
-              <Icon aria-hidden className="size-4" strokeWidth={2} />
-              {t(`admin.nav.${id}`)}
-            </span>
-          ))}
-        </nav>
+              {t('admin.loginButton', 'Вход модератора')}
+            </Button>
+          )}
+        </div>
       </aside>
 
-      <main className="flex-1 p-4 md:p-8">
-        <div className="mx-auto max-w-5xl space-y-4">
-          <header className="flex flex-wrap items-start justify-between gap-3">
+      {/* Основная рабочая область */}
+      <main className="flex-1 p-4 md:p-8 overflow-x-hidden">
+        <div className="mx-auto max-w-6xl space-y-5">
+          {/* Верхняя шапка */}
+          <header className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-sm text-muted-foreground">{t('admin.kicker')}</p>
-              <h1 className="text-2xl leading-tight font-extrabold text-ink md:text-3xl">
-                {t('admin.title')}
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                {t('admin.kicker', 'Пилотная зона: с. Ак-Өлөң (Иссык-Куль)')}
+              </p>
+              <h1 className="text-2xl font-extrabold text-ink md:text-3xl">
+                {t('admin.title', 'Модерация и AI-триаж заявок')}
               </h1>
             </div>
-            <DemoTag />
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="md"
+                onClick={loadData}
+                disabled={isLoading}
+                className="gap-1.5 text-xs h-9 min-h-9"
+              >
+                <RefreshCw className={cx('size-3.5', isLoading && 'animate-spin')} />
+                {t('common.refresh', 'Обновить')}
+              </Button>
+
+              <Button
+                variant="outline"
+                size="md"
+                onClick={handleExportCsv}
+                disabled={filteredReports.length === 0}
+                className="gap-1.5 text-xs h-9 min-h-9"
+                title={t('admin.exportHint', 'Экспорт отфильтрованных заявок в CSV (Excel)')}
+              >
+                <Download className="size-3.5" />
+                CSV
+              </Button>
+
+              <DemoTag />
+            </div>
           </header>
 
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            {DEMO_ADMIN.stats.map(({ id, value }) => (
-              <Card key={id} className="p-4">
-                <p className="text-xs leading-snug text-muted-foreground">{t(`admin.stats.${id}`)}</p>
-                <p className="mt-1 text-2xl font-extrabold text-ink">{value}</p>
-              </Card>
-            ))}
-          </div>
-
-          {exportNote ? <Banner tone="info">{t('admin.demoNote')}</Banner> : null}
-
-          <div className="grid gap-4 lg:grid-cols-[1.7fr_1fr]">
-            <Card className="relative h-72 overflow-hidden p-0 lg:h-auto lg:min-h-80">
-              <MapPreview />
-            </Card>
-
-            <Card className="space-y-3">
-              <h2 className="font-bold text-ink">{t('admin.newReports')}</h2>
-              <ul className="divide-y divide-border">
-                {DEMO_ADMIN.requests.map(({ id, level }) => (
-                  <li key={id} className="flex items-start justify-between gap-2 py-3">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-ink">
-                        {t(`admin.items.${id}Street`)}
-                      </p>
-                      <p className="text-xs leading-snug text-muted-foreground">
-                        {t(`admin.items.${id}Text`)}
-                      </p>
-                    </div>
-                    <RiskBadge level={level} className="px-2 py-0.5 text-xs" />
-                  </li>
-                ))}
-              </ul>
-              <Button
-                size="md"
-                className="w-full"
-                onClick={() => setExportNote((open) => !open)}
-              >
-                {t('admin.export')}
+          {loadError && (
+            <div className="flex items-center justify-between rounded-2xl border border-rose-300 bg-rose-50 p-4 text-xs text-rose-950">
+              <span>{loadError}</span>
+              <Button size="md" variant="outline" onClick={loadData}>
+                {t('common.retry', 'Повторить')}
               </Button>
-            </Card>
-          </div>
+            </div>
+          )}
 
-          <p className="text-xs text-muted-foreground">{t('admin.demoNote')}</p>
+          {/* 1. Дашборд KPI счётчиков */}
+          <AdminKpiCards
+            stats={kpiStats}
+            activeStatus={statusFilter}
+            onSelectStatus={(st) => setStatusFilter(st)}
+            needsReviewActive={needsReviewOnly}
+            onToggleNeedsReview={() => setNeedsReviewOnly((prev) => !prev)}
+          />
+
+          {/* 2. Панель фильтров */}
+          <AdminFilterBar
+            status={statusFilter}
+            onStatusChange={setStatusFilter}
+            urgency={urgencyFilter}
+            onUrgencyChange={setUrgencyFilter}
+            category={categoryFilter}
+            onCategoryChange={setCategoryFilter}
+            needsReviewOnly={needsReviewOnly}
+            onNeedsReviewChange={setNeedsReviewOnly}
+            search={searchQuery}
+            onSearchChange={setSearchQuery}
+            duplicateGroup={duplicateGroupFilter}
+            onClearDuplicateGroup={() => setDuplicateGroupFilter(null)}
+            totalCount={reports.length}
+            filteredCount={filteredReports.length}
+          />
+
+          {/* 3. Список заявок */}
+          {isLoading && reports.length === 0 ? (
+            <div className="flex items-center justify-center p-12">
+              <RefreshCw className="size-6 animate-spin text-brand-deep" />
+            </div>
+          ) : (
+            <AdminReportList
+              reports={filteredReports}
+              selectedReportId={selectedReport?.id ?? null}
+              onSelectReport={(r) => setSelectedReport(r)}
+              onFilterByDuplicateGroup={(grp) => setDuplicateGroupFilter(grp)}
+            />
+          )}
         </div>
       </main>
+
+      {/* Модальное окно входа модератора */}
+      {showLoginDialog && (
+        <AdminLoginDialog
+          onSuccess={(email) => {
+            setModeratorEmail(email)
+            setShowLoginDialog(false)
+            loadData()
+          }}
+          onContinueAsGuest={() => setShowLoginDialog(false)}
+        />
+      )}
+
+      {/* Детальный просмотр заявки (Drawer) */}
+      <AdminReportDrawer
+        report={selectedReport}
+        onClose={() => setSelectedReport(null)}
+        onReportUpdated={handleReportUpdated}
+        onFilterByDuplicateGroup={(grp) => {
+          setDuplicateGroupFilter(grp)
+          setSelectedReport(null)
+        }}
+      />
     </div>
   )
 }

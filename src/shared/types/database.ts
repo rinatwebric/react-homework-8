@@ -7,7 +7,7 @@
  *   npx supabase gen types typescript --project-id <ref> > src/shared/types/database.ts
  * и замени этот файл сгенерированным (структура Database → public.Tables).
  */
-import type { ReportCategory } from '../lib/categories'
+import type { ReportCategory, UrgencyLevel } from '../lib/categories'
 
 /**
  * Статусы заявки (§12).
@@ -44,7 +44,12 @@ export type ReportRow = {
   /** На сколько метров метку сдвинули от GPS (≤300, CHECK в БД). */
   location_adjusted_m: number | null
   immediate_danger: boolean
-  weather_snapshot: unknown
+  weather_snapshot: {
+    temp_c?: number
+    precip_mm?: number
+    humidity?: number
+    [key: string]: unknown
+  } | null
   created_by: string | null
   status: ReportStatus
   moderator_note: string | null
@@ -53,6 +58,36 @@ export type ReportRow = {
   is_demo: boolean
   lat_public: number | null
   lng_public: number | null
+}
+
+/** Строка таблицы ai_triage — AI-предложение для модератора (§8). */
+export type AiTriageRow = {
+  report_id: string
+  category_ai: ReportCategory | null
+  urgency_ai: UrgencyLevel | null
+  summary: string | null
+  recommended_action: string | null
+  duplicate_group: string | null
+  confidence: number | null
+  needs_human_review: boolean
+  model: string | null
+  created_at: string
+}
+
+/** Заявка со связанным AI-триажем для /admin */
+export type ReportWithTriage = ReportRow & {
+  ai_triage: AiTriageRow | null
+}
+
+/** Строка таблицы report_status_history — аудит переходов статусов (§12). */
+export type ReportStatusHistoryRow = {
+  id: number
+  report_id: string
+  from_status: ReportStatus | string | null
+  to_status: ReportStatus | string
+  note: string | null
+  changed_by: string | null
+  created_at: string
 }
 
 /** Строка view reports_public — то, что видит любой житель (координаты округлены). */

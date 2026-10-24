@@ -272,6 +272,8 @@ await db.exec(`select set_config('request.jwt.claim.sub', '${modId}', false)`)
 await db.exec('set role authenticated')
 const modRead = await db.query('select count(*)::int as n from public.reports_public')
 check('authenticated читает публичное представление', modRead.rows[0].n === 1)
+const modExact = await db.query('select lat, lng, moderator_note from public.reports limit 1')
+check('authenticated видит точный lat/lng и moderator_note', modExact.rows.length === 1 && typeof modExact.rows[0].lat === 'number')
 await db.exec("update public.reports set status = 'triaged'")
 const updated = await db.query(
   "select status from public.reports_public where status = 'triaged'",
