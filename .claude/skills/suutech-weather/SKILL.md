@@ -1,48 +1,48 @@
 ---
 name: suutech-weather
-description: SuuTech weather and soil-moisture flood risk (P1). Use when calling Open-Meteo (past 7 days precipitation, 3-day forecast, soil moisture), building the country-wide grid of district centers, writing the weather threshold rules, the weather-check Edge Function and its 3-6 hour schedule, the home-screen risk banner, or farmer water advice tied to weather.
+description: SuuTech weather block (P0 in TZ v2.0). Use when calling Open-Meteo for current temperature, precipitation, humidity and a 3-day forecast, caching it with a TTL, writing the weather-current Edge Function, storing a weather snapshot inside a report, showing the home-screen weather card and the "rain expected" banner, or keeping the block honest about being reference data rather than a flood forecast.
 ---
 
-# Погода и влажность почвы SuuTech
+# Погода SuuTech (ТЗ v2.0, §10)
 
-Требования: `docs/spec.md` §6.4, §6.6. Погода — один из трёх сигналов риска зоны (см. `suutech-sensors`).
+Погода — видимая часть продукта: житель открывает приложение и сразу видит, что происходит с водой в небе,
+а заявка сохраняет снимок условий на момент отправки. Требования: `docs/spec.md` §10.
+Датчиков и влажности почвы в MVP больше нет — старые правила удаляются в PR-5.
 
 ## Open-Meteo (без ключа)
 ```
-GET https://api.open-meteo.com/v1/forecast?latitude={lat1,lat2,...}&longitude={lng1,lng2,...}
-    &daily=precipitation_sum&hourly=soil_moisture_3_to_9cm,soil_moisture_27_to_81cm
-    &past_days=7&forecast_days=3&timezone=auto
+GET https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lng}
+    &current=temperature_2m,relative_humidity_2m,precipitation,rain,showers
+    &hourly=precipitation_probability,precipitation
+    &daily=precipitation_sum,precipitation_probability_max,temperature_2m_max,temperature_2m_min
+    &forecast_days=4&timezone=auto
 ```
-- Одна точка → объект; **несколько точек через запятую → массив объектов** в том же порядке. Для сетки страны
-  отправляй пачками (например по 20–50 точек), а не 41 отдельный запрос.
-- `daily.precipitation_sum` — 10 значений (мм): 7 прошедших + 3 прогнозных, сегодняшний день входит в прогнозные.
-- `hourly.soil_moisture_*` — объёмная влажность, **м³/м³** (0.18 = 18 %), 240 часовых значений. Для правил бери
-  среднее за последние 24 ч и сравнивай с медианой за 7 дней из того же ответа. Не смешивай с `soil_moisture_pct`
-  датчиков (там проценты) — переводи явно.
-- Валидируй zod; `null` в массивах → пропустить значение и залогировать. Координаты пользователя округляй до 0.01.
+- `current` — температура, влажность, осадки «сейчас»; `daily` — 4 дня (сегодня + 3), в UI показываем 3 будущих.
+- Одна точка — объект; несколько координат через запятую — **массив в том же порядке**. Для сетки отправляй пачки по 20–50.
+- Валидируй zod; `null` в массивах → пропускаем значение и логируем, а не рисуем `NaN`. Координаты для запроса округляем до 0.01.
+- Таймзона — `auto`; время обновления показываем в местном времени.
 
-## Сетка страны
-- Точки — центроиды районов из того же GeoJSON, что и зоны карты (`suutech-map-geo`), с `zone_id`.
-  Сгенерируй их скриптом из GeoJSON в `src/config/zones.json` (`zone_id`, `name`, `lat`, `lng`), не вручную.
-- `weather-check` по расписанию (раз в 3 ч, `pg_cron` + `pg_net` + секрет) проходит всю сетку, сохраняет
-  результаты (`weather_snapshot` по `zone_id`) и вызывает `compute-zone-risk`. Так «вся страна» в демо
-  подтверждена погодным слоем, без выдуманных данных.
+## Edge Function `weather-current`
+- `GET ?lat&lng` для точки пользователя и `GET ?zone_id` для пилотной зоны (координаты берутся из `src/config/zones.json`).
+- Кэш: таблица/`kv` с TTL 30–60 минут (для демо хватает 30). Ошибка или таймаут Open-Meteo → отдать последний кэш
+  с отметкой времени; кэша нет — 502 и в UI «Погода недоступна», блок просто скрывается.
+- Ответ: `{ temp_c, feels_like_c?, humidity, precip_mm, precip_probability, updated_at, days: [{date, t_max, t_min, precip_mm, precip_prob}] }`.
+- Никаких ключей в клиенте; функция публичная, данные не персональные.
 
-## Правило погодного риска (единый источник)
-- `supabase/functions/_shared/weather-rules.ts`:
-  `assessWeather({ past7, next3, soilNow, soilMedian }, thresholds) → { level: 'normal'|'elevated'|'high', reasons[] }`.
-- Пороги в конфиге (`WEATHER_THRESHOLDS = { elevated: 40, high: 70 }` мм суммарно; влажность почвы выше медианы на
-  20 % → +1 уровень, не выше `high`). Погода сама не даёт `critical` — это только с датчиками.
-- В UI и питче честно: «стартовые пороги, калибруются по данным пилота».
-- Клиент не дублирует логику: баннер берёт результат из `weather-check` (`GET ?lat&lng`). Функция недоступна →
-  баннер не показываем, уровень на клиенте не придумываем.
+## Снимок в заявке
+- `submit-report` пишет `weather_snapshot` (те же поля, компактно) на момент создания заявки. Если функция недоступна —
+  `weather_snapshot = null`, заявка всё равно уходит: погода не блокирует отправку.
+- В карточке админки снимок показывается как контекст («на момент заявки: +12 °C, дождь 1.2 мм»), без выводов о риске.
 
-## Баннер на главной
-- `normal` — компактная зелёная плашка (или скрыта); `elevated`/`high` — жёлтый/оранжевый, иконка, текст + 2–3 совета.
-  Если зона пользователя в `critical` по датчикам — красный баннер из `zone_risk`/`alerts`.
-- Время обновления и источник «Open-Meteo»; офлайн — последнее значение из кэша с отметкой времени.
-- Режим фермера: блок «Вода для фермеров» по тем же данным (накопление при осадках, полив в сухие дни, риск заболачивания при высокой влажности почвы).
+## Главный экран
+- Карточка погоды: крупная температура, иконка условий, осадки/вероятность, влажность, три дня вперёд.
+- Баннер «Ожидаются осадки — проверьте подвалы, арыки и места скопления воды» при
+  `precip_probability ≥ 60 %` или `precip_mm > 5` в ближайшие 24 часа. Это совет, не прогноз подтопления.
+- Рядом с погодой — кнопка 112 (см. `suutech-demo-readiness`): при опасности человек звонит, а не ждёт.
+- Офлайн — последнее значение из кэша с отметкой времени, без «пустого» блока.
+- Подпись источника «Open-Meteo» и формулировка «справочные данные».
 
 ## Тесты
-- Vitest: `assessWeather` на граничных значениях, `null`, нет данных о почве; парсинг массива из нескольких точек.
-- Фикстуры реальных ответов (одна точка и несколько) в `src/features/weather/__fixtures__/`.
+- Vitest: парсинг ответа (одна точка и массив), отсутствующие поля, выбор иконки по коду осадков,
+  порог баннера (59 % — нет, 60 % — да), форматирование дней.
+- Фикстуры реальных ответов в `src/features/home/__fixtures__/`.

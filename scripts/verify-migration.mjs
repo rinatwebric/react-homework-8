@@ -86,6 +86,9 @@ const TABLES_WITH_RLS = [
   'moderators',
   'photo_assessments',
   'zone_risk',
+  // ТЗ v2.0: AI-триаж и история статусов — только для модераторов
+  'ai_triage',
+  'report_status_history',
 ]
 const relrowsecurity = await db.query(`
   select relname, relrowsecurity from pg_class
@@ -114,6 +117,18 @@ await db.exec(`
   );
 `)
 
+// ТЗ v2.0: поля заявки (категория, комментарий, опасность, сдвиг метки, погода) + AI-триаж.
+await db.exec(`
+  update public.reports set
+    category_user = 'standing_water',
+    comment = 'Вода стоит у арыка второй день',
+    immediate_danger = true,
+    location_adjusted_m = 300,
+    weather_snapshot = '{"temp_c":12.5,"precip_mm":1.2,"humidity":78}'::jsonb;
+  insert into public.ai_triage (report_id, category_ai, urgency_ai, summary, confidence)
+  select id, 'drainage_issue', 'high', 'Стоячая вода у арыка', 0.72 from public.reports limit 1;
+`)
+
 await expectError(
   'ok-запись photo_assessments без assessment запрещена',
   `insert into public.photo_assessments (sha256, client_id, status)
@@ -139,6 +154,34 @@ check(
     Number(bucket.rows[0].file_size_limit) === 2097152 &&
     bucket.rows[0].allowed_mime_types.join(',') === 'image/jpeg,image/png,image/webp',
   JSON.stringify(bucket.rows[0]?.allowed_mime_types),
+)
+
+// ТЗ v2.0 §7 и §12: лимиты полей заявки и словарь статусов.
+const statusDef = await db.query(`
+  select pg_get_constraintdef(oid) as def from pg_constraint
+  where conname = 'reports_status_check'`)
+check(
+  'статусы §12 разрешены (triaged/assigned/rejected)',
+  statusDef.rows[0].def.includes('triaged') &&
+    statusDef.rows[0].def.includes('assigned') &&
+    statusDef.rows[0].def.includes('rejected'),
+  statusDef.rows[0].def,
+)
+await expectError(
+  'комментарий длиннее 500 символов отклоняется',
+  `update public.reports set comment = repeat('x', 501)`,
+)
+await expectError(
+  'сдвиг метки больше 300 м отклоняется',
+  'update public.reports set location_adjusted_m = 300.5',
+)
+await expectError(
+  'неизвестная категория отклоняется',
+  "update public.reports set category_user = 'flood'",
+)
+await expectError(
+  'неизвестный статус отклоняется',
+  "update public.reports set status = 'done'",
 )
 
 await db.exec('set role anon')
@@ -174,6 +217,24 @@ await expectError(
   'anon НЕ видит кэш AI-оценок',
   'select * from public.photo_assessments',
 )
+await expectError('anon НЕ видит AI-триаж', 'select * from public.ai_triage')
+await expectError(
+  'anon НЕ видит историю статусов',
+  'select * from public.report_status_history',
+)
+await expectError(
+  'anon НЕ видит created_by заявки',
+  'select created_by from public.reports',
+)
+const pubV2 = await db.query('select * from public.reports_public')
+check(
+  'в reports_public есть категория и нет служебных полей',
+  pubV2.rows[0].category_user === 'standing_water' &&
+    pubV2.rows[0].immediate_danger === true &&
+    !('created_by' in pubV2.rows[0]) &&
+    !('moderator_note' in pubV2.rows[0]),
+  JSON.stringify(Object.keys(pubV2.rows[0])),
+)
 await db.exec('reset role')
 
 await db.exec(`select set_config('request.jwt.claim.sub', '${modId}', false)`)
@@ -185,6 +246,17 @@ const updated = await db.query(
   "select status from public.reports_public where status = 'reviewed'",
 )
 check('модератор меняет статус отчёта', updated.rows.length === 1)
+const history = await db.query(
+  'select from_status, to_status, changed_by from public.report_status_history',
+)
+check(
+  'история статуса пишется триггером',
+  history.rows.length === 1 &&
+    history.rows[0].from_status === 'new' &&
+    history.rows[0].to_status === 'reviewed' &&
+    history.rows[0].changed_by === modId,
+  JSON.stringify(history.rows),
+)
 await db.exec('reset role')
 
 await db.exec(`select set_config('request.jwt.claim.sub', '', false)`)

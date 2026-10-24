@@ -6,8 +6,8 @@
 1. **Получи проект через git, а не копированием папок.** Скрытые папки (`.agents`, `.claude`, `.cursor`) при
    копировании через Проводник/Finder часто теряются, и агент не видит скиллы:
    `git clone https://github.com/rinatwebric/react-homework-8.git suutech-kg && cd suutech-kg && npm install`
-2. Проверь, что в корне есть: `AGENTS.md`, `CLAUDE.md`, `docs/`, `.agents/skills/` (21 папка), `.claude/skills/`,
-   `.mcp.json`. Проверка: `npx skills ls` — должно быть 21 скилл.
+2. Проверь, что в корне есть: `AGENTS.md`, `CLAUDE.md`, `docs/`, `.agents/skills/` (20 папок), `.claude/skills/`,
+   `.mcp.json`. Проверка: `npx skills ls` — должно быть 20 скиллов.
 3. Открой **корень проекта** в агенте: Claude Code — `cd suutech-kg && claude`; Cursor / Windsurf — File → Open Folder;
    Codex — `codex` в корне. Агент сам прочитает `AGENTS.md` и увидит скиллы.
 4. Проверь, что агент «понял» проект — первый промпт:
@@ -25,7 +25,7 @@
 | `docs/spec.md` | Полное ТЗ в markdown — агент читает нужные разделы |
 | `docs/plan.md` | Срезы с чекбоксами, агент отмечает прогресс |
 | `docs/decisions.md` | Журнал спорных решений |
-| `.agents/skills/`, `.claude/skills/` | Скиллы: 8 проектных `suutech-*` + 13 внешних (Supabase, Vercel, Anthropic, дизайн) |
+| `.agents/skills/`, `.claude/skills/` | Скиллы: 7 проектных `suutech-*` + 13 внешних (Supabase, Vercel, Anthropic, дизайн) |
 | `.claude/agents/` | Субагенты `suutech-reviewer` и `suutech-debugger` |
 | `.claude/commands/` | Команды `/slice`, `/review`, `/bug`, `/freeze-check` |
 | `.mcp.json`, `.cursor/mcp.json` | MCP: Context7 (документация), Playwright (браузер), Supabase (только чтение) |
@@ -33,7 +33,7 @@
 | `skills-lock.json` | Версии внешних скиллов (`npx skills update -p` — обновить) |
 
 Скиллы подключаются **автоматически**: агент видит их описания и загружает нужный, когда задача подходит.
-Можно и явно: «используй скилл suutech-ai-scanner».
+Можно и явно: «используй скилл suutech-triage».
 
 ## 2. Первичная настройка (один раз, 10 минут)
 1. Supabase MCP: в `.mcp.json` и `.cursor/mcp.json` допиши в URL `&project_ref=<ref твоего проекта>`
@@ -85,26 +85,29 @@
 ```
 (В Claude Code: `/bug <описание>`.)
 
-### Датчики и симулятор (срез 3)
+### Форма заявки и радиус (PR-2)
 ```
-Скилл suutech-sensors (+ suutech-backend). Сделай таблицы датчиков, ingest-sensor, compute-zone-risk и
-scripts/simulate-sensors.ts с режимами normal / rise / reset. Сначала план и правила риска с порогами из конфига.
-Проверка: npm run simulate -- --mode rise → зона на карте переходит в «высокий», появляется запись в alerts.
+Скиллы suutech-map-geo и suutech-backend. Сделай форму заявки по docs/spec.md §9-10: категория, комментарий ≤500,
+отметка «опасно для жизни», фото необязательно, координата и точное место ±300 м, погода на момент отправки.
+Сначала план, потом код. Проверка: npm run verify:sql проходит, заявка без фото уходит, точка дальше 300 м
+не отправляется (проверка и в UI, и на сервере, и в БД).
 ```
 
-### Настройка AI-промпта на фото
+### Настройка AI-триажа (PR-4)
 ```
-Скилл suutech-ai-scanner. Вот результаты на 12 фото: <таблица фото → risk → confidence → правильно ли>.
-Найди закономерность ошибок и предложи правку системного промпта. Не меняй контракт JSON.
+Скилл suutech-triage. Вот результаты на 20 заявках: <таблица текст/фото → категория → срочность → верно ли>.
+Найди закономерность ошибок и предложи правку промпта classify-report. Не меняй контракт JSON и не давай
+модели решать, что «опасности нет»: срочность только повышается, финальное решение за модератором.
 ```
 
 ### Дизайн-система (один раз, в срезе 0)
 ```
 Используй скиллы ui-ux-pro-max и tailwind-design-system.
 Запусти: python3 .agents/skills/ui-ux-pro-max/scripts/search.py "civic flood risk alert map mobile pwa rural" --design-system -p "SuuTech"
-Возьми из результата стиль, шрифты и UX-правила, но учти AGENTS.md: зелёный/жёлтый/оранжевый/красный только для уровней риска,
-бренд-цвет другой. Оформи токены в @theme в src/index.css, базовые компоненты (Button, Banner, RiskBadge, Card,
-состояния Loading/Error/Empty) в src/shared/ui. Покажи палитру и компоненты на странице /dev/ui.
+Возьми из результата стиль, шрифты и UX-правила, но учти AGENTS.md: зелёный/жёлтый/оранжевый/красный только для
+срочности заявки, бренд-цвет другой. Оформи токены в @theme в src/index.css, базовые компоненты (Button, Banner,
+UrgencyBadge, CategoryChip, Card, состояния Loading/Error/Empty) в src/shared/ui. Покажи палитру и компоненты на
+странице /dev/ui.
 ```
 
 ### Дизайн экрана
@@ -122,8 +125,8 @@ scripts/simulate-sensors.ts с режимами normal / rise / reset. Снач�
 ### Проверка в браузере
 ```
 Скилл webapp-testing. Напиши Playwright-тест: geolocation разрешена (координаты пилота),
-загрузка тестового фото, мок ответа analyze-photo, отправка, метка на карте. Ещё один тест: офлайн → отчёт →
-онлайн → одна запись на сервере.
+заявка без фото, мок ответа classify-report, отправка, метка на карте. Ещё один тест: офлайн → заявка →
+онлайн → одна запись на сервере (идемпотентность по client_id).
 ```
 
 ### Готовность к демо
@@ -138,13 +141,14 @@ scripts/simulate-sensors.ts с режимами normal / rise / reset. Снач�
 ```
 
 ## 5. Кто что просит у агента
-- **Ринат (backend):** срезы 0 (Supabase), 1 (`analyze-photo`, промпт), 3–4 (погода, датчики и симулятор, офлайн-синк, push).
-  Скилл `suutech-sensors` тоже твой.
-  Скиллы: `suutech-backend`, `supabase`, `supabase-postgres-best-practices`, `suutech-ai-scanner`, `suutech-weather`, `suutech-web-push`.
-- **Анархан (frontend):** экраны, карта, PWA-оболочка, i18n.
-  Скиллы: `suutech-map-geo`, `suutech-offline-pwa`, `ui-ux-pro-max`, `tailwind-design-system`, `frontend-design`, `web-design-guidelines`, `vercel-react-best-practices`.
-- **Мелике:** тексты рекомендаций, тестовые фото, проверка кыргызского (`TODO-ky`), слайды через `pptx`.
-- Работаете параллельно → разные ветки (`feat/scanner`, `feat/map`), PR в `main`, ревью перед мержем.
+- **Ринат (backend):** PR-1 (схема и контракты), PR-2 (`submit-report` v4), PR-3 (погода, 112, офлайн-синк),
+  PR-4 (`classify-report`, `send-alert`), PR-5 (push, ky, чистка v1.0).
+  Скиллы: `suutech-backend`, `suutech-triage`, `suutech-weather`, `supabase`, `supabase-postgres-best-practices`.
+- **Анархан (frontend):** экраны, форма заявки, карта пилота с подписью «слой-ориентир», PWA-оболочка, i18n.
+  Скиллы: `suutech-map-geo`, `suutech-offline-pwa`, `ui-ux-pro-max`, `tailwind-design-system`, `frontend-design`,
+  `web-design-guidelines`, `vercel-react-best-practices`.
+- **Мелике:** тексты категорий и подсказок, тестовые заявки, проверка кыргызского (`TODO-ky`), слайды через `pptx`.
+- Работаете параллельно → разные ветки (`feat/report-form`, `feat/map`), PR в `main`, ревью перед мержем.
 
 ## 6. Если агент «поплыл»
 - Делает не то → остановить, `git restore .`, новый чат с более узкой задачей.

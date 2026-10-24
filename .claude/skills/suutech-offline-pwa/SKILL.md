@@ -5,7 +5,7 @@ description: SuuTech PWA shell and offline mode (P0 install + P1 offline). Use w
 
 # PWA и офлайн SuuTech
 
-Требования: `docs/spec.md` §7.1, §11. Это «вау-момент» демо: авиарежим → отчёт → сеть → метка на карте.
+Требования: `docs/spec.md` §5 (P1) и §6. Это «вау-момент» демо: авиарежим → заявка → сеть → метка на карте.
 
 ## PWA-оболочка (срез 0)
 - `vite-plugin-pwa` 2.x, `strategies: 'injectManifest'`, `srcDir: 'src'`, `filename: 'sw.ts'` — свой SW нужен для push.
@@ -27,18 +27,20 @@ description: SuuTech PWA shell and offline mode (P0 install + P1 offline). Use w
 
 ## Очередь отчётов (IndexedDB, `idb`)
 - БД `suutech`, store `reports` (keyPath `client_id`), индекс по `status`. Модуль `src/features/offline/queue.ts`.
-- Запись: `{ client_id (crypto.randomUUID()), photo: Blob, captured_at, lat, lng, accuracy_m, mode, lang,
-  status, attempts, last_error, assessment? , created_at }`. При чтении — валидация zod (данные могли устареть).
+- Запись: `{ client_id (crypto.randomUUID()), category_user, comment, immediate_danger, lat, lng, accuracy_m,
+  location_adjusted_m, photo?: Blob, weather_snapshot, captured_at, lang, status, attempts, last_error, created_at }`.
+  Фото необязательно — заявка без него полноценна. При чтении — валидация zod (данные могли устареть).
 - Статусы: `draft → queued → uploading → done | failed`. Переходы — чистая функция-редьюсер с тестами.
   `uploading`, «зависший» дольше 2 мин (вкладку закрыли) → обратно в `queued`.
-- Синхронизация `syncQueue()`: по одному отчёту; `analyze-photo` → `submit-report` (с тем же `client_id`).
+- Синхронизация `syncQueue()`: по одной заявке, только `submit-report` (с тем же `client_id`), фото — если есть.
   Успех → `done` и удалить Blob; ошибка сети → `queued`, `attempts++`, backoff 5 с · 2^n (макс 5 мин);
   ошибка 4xx (валидация) → `failed` с понятным текстом и кнопкой «Удалить/Повторить».
 - Триггеры: Background Sync (`registration.sync.register('sync-reports')`, есть только в Chromium) + событие
   `online` + при старте приложения + кнопка «Отправить сейчас». Защита от параллельного запуска — lock (флаг в памяти
   + `navigator.locks.request`, где доступно).
 - Сервер идемпотентен по `client_id`, поэтому повторная отправка не создаёт дублей — это и есть проверка приёмки.
-- Офлайн AI нет: показываем «Отчёт сохранён. Оценка появится при подключении». Не выдавать локальный чек-лист за AI.
+- Офлайн-погоды и офлайн-AI нет: заявка сохраняется с `weather_snapshot = null`, а `ai_triage` появится, когда её
+  обработает `classify-report` в админке. Локальные «советы» нельзя выдавать за AI.
 
 ## UI
 - Плашка «Нет сети · в очереди: N» (`navigator.onLine` + события + реальный результат последнего запроса).
