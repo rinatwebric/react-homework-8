@@ -34,9 +34,11 @@ export function HomePage() {
   const [alertsOpen, setAlertsOpen] = useState(false)
   const [alerts, setAlerts] = useState<AlertItem[]>([])
   const [unreadCount, setUnreadCount] = useState<number>(0)
-  const [userLocation, setUserLocation] = useState<string>(() => {
+  const [userLocation, setUserLocation] = useState<{ name: string; typeLabel: string }>(() => {
     const cached = getCachedLocationName()
-    return cached ? cached.villageOrCity : PILOT_ZONE.nameRu
+    return cached
+      ? { name: cached.placeName, typeLabel: cached.typeLabelRu }
+      : { name: PILOT_ZONE.nameRu, typeLabel: t('home.villageLabel', 'Ваше село') }
   })
 
   // Определение фактического местоположения пользователя
@@ -46,8 +48,8 @@ export function HomePage() {
       (pos) => {
         const { latitude, longitude } = pos.coords
         void reverseGeocodeVillage(latitude, longitude).then((loc) => {
-          if (loc?.villageOrCity) {
-            setUserLocation(loc.villageOrCity)
+          if (loc?.placeName) {
+            setUserLocation({ name: loc.placeName, typeLabel: loc.typeLabelRu })
           }
         })
       },
@@ -117,9 +119,9 @@ export function HomePage() {
     <div className="space-y-4">
       <header className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-sm text-muted-foreground">{t('home.villageLabel')}</p>
+          <p className="text-sm font-medium text-muted-foreground">{userLocation.typeLabel}</p>
           <h1 className="text-3xl leading-tight font-extrabold tracking-tight text-ink">
-            {userLocation}
+            {userLocation.name}
           </h1>
         </div>
         <button
