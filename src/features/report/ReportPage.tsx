@@ -8,9 +8,12 @@ import { createClientId } from '../../shared/lib/client-id'
 import { Banner } from '../../shared/ui/Banner'
 import { Button } from '../../shared/ui/Button'
 import { Card } from '../../shared/ui/Card'
+import { EmergencyCallButton } from '../../shared/ui/EmergencyCallButton'
 import { ErrorState } from '../../shared/ui/ErrorState'
 import { ScreenHeader } from '../../shared/ui/ScreenHeader'
 import { readReportContext } from '../../shared/types/report-context'
+import type { WeatherSnapshot } from '../../shared/types/report-contract'
+import { useWeather } from '../weather/hooks/useWeather'
 import { CategoryPicker } from './components/CategoryPicker'
 import { CommentField } from './components/CommentField'
 import { DangerToggle } from './components/DangerToggle'
@@ -28,15 +31,14 @@ import {
 import { SubmitReportError, submitReport, type SubmitReportErrorCode } from './lib/submit-report'
 
 /**
- * Срез 2, PR-2: заявка жителя v2.0 (§7).
+ * Срез 2 & 3: заявка жителя v2.0 (§7, §10, §11).
  *
  * Обязательно: категория и координаты (GPS или пин в радиусе 300 м от GPS).
  * Необязательно: комментарий до 500 символов, фото (с камеры или из галереи),
- * отметка «опасно для жизни». AI-оценка фото в заявку не входит — она нужна
- * только модератору (§8), поэтому и на форму не выводится.
- *
- * Все записи — только через Edge Function `submit-report` v4: у anon нет INSERT
- * в reports.
+ * отметка «опасно для жизни».
+ * Срез 3: при наличии погодных данных снимок погоды (weather_snapshot)
+ * автоматически прикрепляется к заявке (если недоступен — null, отправка не блокируется).
+ * Кнопка 112 вынесена для экстренных ситуаций.
  */
 export function ReportPage() {
   const { t } = useTranslation()
@@ -53,6 +55,22 @@ export function ReportPage() {
   const [submitting, setSubmitting] = useState(false)
   const [sent, setSent] = useState<{ id: string; duplicate: boolean } | null>(null)
   const [errorCode, setErrorCode] = useState<SubmitReportErrorCode | null>(null)
+
+  // Получаем погоду для текущей точки (Срез 3, §10)
+  const { weather } = useWeather({
+    lat: geo.point?.lat,
+    lng: geo.point?.lng,
+  })
+
+  const weatherSnapshot: WeatherSnapshot | null = useMemo(() => {
+    if (!weather) return null
+    return {
+      captured_at: new Date().toISOString(),
+      temperature_c: weather.temp_c,
+      precipitation_mm: weather.precip_mm,
+      humidity_pct: weather.humidity,
+    }
+  }, [weather])
 
   useEffect(() => {
     let active = true
@@ -81,8 +99,9 @@ export function ReportPage() {
       point: geo.point,
       gps: geo.gps ? { lat: geo.gps.lat, lng: geo.gps.lng, accuracyM: geo.gps.accuracyM } : null,
       photoPath,
+      weatherSnapshot,
     }),
-    [clientId, deviceHash, category, comment, immediateDanger, geo.point, geo.gps, photoPath],
+    [clientId, deviceHash, category, comment, immediateDanger, geo.point, geo.gps, photoPath, weatherSnapshot],
   )
 
   const block = submissionBlock(draft)
@@ -122,6 +141,8 @@ export function ReportPage() {
     <div className="space-y-4">
       <ScreenHeader title={t('report.title')} />
       <p className="-mt-2 text-sm leading-snug text-muted-foreground">{t('report.lead')}</p>
+
+      <EmergencyCallButton />
 
       <CategoryPicker value={category} onChange={setCategory} />
 

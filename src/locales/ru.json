@@ -232,5 +232,43 @@
   "footer": {
     "hackathon": "Logos Hackathon · команда SuuTech",
     "adminLink": "Вход для служб"
+  },
+  "weather": {
+    "title": "Погода",
+    "loading": "Загрузка погоды…",
+    "unavailable": "Погода временно недоступна",
+    "refresh": "Обновить погоду",
+    "updatedAt": "Обновлено в {{time}}",
+    "humidity": "Влажность",
+    "precipitation": "Осадки",
+    "mm": "мм",
+    "forecast3Days": "Прогноз на 3 дня",
+    "disclaimer": "Данные Open-Meteo (справочно, не прогноз подтоплений)",
+    "rainWarningTitle": "Внимание",
+    "rainWarning": "Ожидаются осадки — проверьте подвалы, арыки и места скопления воды",
+    "conditions": {
+      "clear": "Ясно",
+      "mainlyClear": "В основном ясно",
+      "partlyCloudy": "Переменная облачность",
+      "overcast": "Пасмурно",
+      "fog": "Туман",
+      "drizzle": "Морось",
+      "freezingDrizzle": "Замерзающая морось",
+      "rain": "Дождь",
+      "heavyRain": "Сильный дождь",
+      "freezingRain": "Ледяной дождь",
+      "snow": "Снег",
+      "rainShowers": "Кратковременный дождь",
+      "violentShowers": "Сильный ливень",
+      "snowShowers": "Снегопад",
+      "thunderstorm": "Гроза",
+      "thunderstormHail": "Гроза с градом",
+      "cloudy": "Облачно"
+    }
+  },
+  "emergency": {
+    "title": "Опасность прямо сейчас?",
+    "call": "Позвонить 112",
+    "guidance": "При непосредственной угрозе жизни и жилью звоните 112. Не ждите ответа в приложении."
   }
 }

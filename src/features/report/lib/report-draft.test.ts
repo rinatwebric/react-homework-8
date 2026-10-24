@@ -138,6 +138,32 @@ describe('buildSubmitPayload: тело запроса v2.0', () => {
     expect(result).toEqual({ ok: false, reason: 'invalid' })
   })
 
+  it('переносит weather_snapshot, если он приложен к заявке', () => {
+    const snapshot = {
+      captured_at: '2026-10-24T12:00:00.000Z',
+      temperature_c: 12.5,
+      precipitation_mm: 1.2,
+      humidity_pct: 75,
+    }
+    const result = buildSubmitPayload({
+      ...draft,
+      weatherSnapshot: snapshot,
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.payload.weather_snapshot).toEqual(snapshot)
+  })
+
+  it('оставляет weather_snapshot = null, если погода недоступна', () => {
+    const result = buildSubmitPayload({
+      ...draft,
+      weatherSnapshot: null,
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.payload.weather_snapshot).toBeNull()
+  })
+
   it('возвращает причину блокировки вместо мусора', () => {
     expect(buildSubmitPayload({ ...draft, category: null })).toEqual({
       ok: false,

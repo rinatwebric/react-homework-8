@@ -16,6 +16,7 @@ import {
   REPORT_CONTRACT_VERSION,
   submitReportRequestSchema,
   type SubmitReportRequest,
+  type WeatherSnapshot,
 } from '../../../shared/types/report-contract'
 
 /** GPS-фикс формы: координаты + точность. Без фикса отправка невозможна (§7.2). */
@@ -40,6 +41,8 @@ export type ReportDraft = {
   gps: DraftGps | null
   /** Путь фото в бакете; null — отчёт без фото. */
   photoPath: string | null
+  /** Снимок погоды в момент заявки (Open-Meteo, Срез 3); null — погода недоступна. */
+  weatherSnapshot?: WeatherSnapshot | null
 }
 
 export type ReportBlock = 'location' | 'gps' | 'category' | 'comment' | 'pin_far' | 'invalid'
@@ -99,8 +102,7 @@ export function buildSubmitPayload(draft: ReportDraft): BuildResult {
     point,
     gps: { lat: gps.lat, lng: gps.lng, accuracy_m: gps.accuracyM },
     photo_path: draft.photoPath,
-    // Снимок погоды приходит в PR-3 (Open-Meteo) — пока null, поле контракта есть.
-    weather_snapshot: null,
+    weather_snapshot: draft.weatherSnapshot ?? null,
   }
 
   const parsed = submitReportRequestSchema.safeParse(payload)

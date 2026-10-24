@@ -3,23 +3,32 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
 import { DEMO_HOME } from '../../config/demo'
+import { features } from '../../config/features'
 import { PILOT_ZONE } from '../../config/pilot'
 import { Banner } from '../../shared/ui/Banner'
 import { ButtonLink } from '../../shared/ui/Button'
 import { Card } from '../../shared/ui/Card'
 import { DemoTag } from '../../shared/ui/DemoTag'
+import { EmergencyCallButton } from '../../shared/ui/EmergencyCallButton'
 import { IconTile } from '../../shared/ui/IconTile'
 import { RiskScale } from '../../shared/ui/RiskScale'
+import { RainWarningBanner } from '../weather/components/RainWarningBanner'
+import { WeatherCard } from '../weather/components/WeatherCard'
+import { useWeather } from '../weather/hooks/useWeather'
 
 const TILES = [
   { to: '/map', icon: MapPin, titleKey: 'home.tiles.mapTitle', textKey: 'home.tiles.mapText' },
   { to: '/report', icon: Plus, titleKey: 'home.tiles.reportTitle', textKey: 'home.tiles.reportText' },
 ] as const
 
-/** Главная: село, риск на сегодня, плитки разделов и совет (макет 1). */
+/** Главная: село, погода Open-Meteo, экстренная помощь 112, плитки разделов и риск (Срез 3). */
 export function HomePage() {
   const { t } = useTranslation()
   const [alertsOpen, setAlertsOpen] = useState(false)
+  const { weather, loading, refresh } = useWeather({
+    lat: PILOT_ZONE.center.lat,
+    lng: PILOT_ZONE.center.lng,
+  })
 
   return (
     <div className="space-y-4">
@@ -42,6 +51,15 @@ export function HomePage() {
       </header>
 
       {alertsOpen ? <Banner tone="info">{t('home.bellNote')}</Banner> : null}
+
+      {features.weather ? (
+        <>
+          <RainWarningBanner weather={weather} />
+          <WeatherCard weather={weather} loading={loading} onRefresh={() => void refresh()} />
+        </>
+      ) : null}
+
+      <EmergencyCallButton />
 
       <Card tone="ink" className="space-y-4 p-6">
         <p className="text-sm font-medium text-on-ink/70">{t('home.riskLabel')}</p>
