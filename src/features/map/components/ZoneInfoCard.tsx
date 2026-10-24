@@ -48,6 +48,7 @@ export function ZoneInfoCard({ zoneName, level, reports, onClose }: ZoneInfoCard
       {level ? null : (
         <p className="mt-1 text-xs leading-snug text-muted-foreground">{t('map.zoneNoDataHint')}</p>
       )}
+      <p className="mt-1 text-xs leading-snug text-muted-foreground">{t('map.zoneModelHint')}</p>
     </div>
   )
 }

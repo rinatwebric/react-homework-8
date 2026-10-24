@@ -1,47 +1,47 @@
 import { describe, expect, it } from 'vitest'
-import { buildSubmitPayload, parseWellDepth, submissionBlock, type ReportDraft } from './report-draft'
+import {
+  buildSubmitPayload,
+  commentLength,
+  locationOffsetM,
+  submissionBlock,
+  type ReportDraft,
+} from './report-draft'
+
+const gps = { lat: 42.34793, lng: 76.1669, accuracyM: 12 }
 
 const draft: ReportDraft = {
   clientId: '22222222-2222-4222-8222-222222222222',
   deviceHash: 'a'.repeat(64),
-  point: { lat: 42.34793, lng: 76.1669 },
-  accuracyM: 12,
-  waterInBasement: true,
-  wellDepthRaw: '1,5',
-  gpsOffsetM: 0,
-  photo: null,
+  category: 'basement_water',
+  comment: 'Вода в подвале с ночи',
+  immediateDanger: false,
+  point: { lat: 42.3481, lng: 76.1672 },
+  gps,
+  photoPath: null,
 }
 
-describe('parseWellDepth: глубина колодца', () => {
-  it('пустое поле — «не знаю»', () => {
-    expect(parseWellDepth('')).toEqual({ ok: true, value: null })
-    expect(parseWellDepth('   ')).toEqual({ ok: true, value: null })
+describe('commentLength: символы, а не UTF-16', () => {
+  it('считает эмодзи за один символ, как char_length в Postgres', () => {
+    expect(commentLength('вода')).toBe(4)
+    expect(commentLength('💧')).toBe(1)
+    expect(commentLength('💧💧')).toBe(2)
+  })
+})
+
+describe('locationOffsetM: сдвиг метки от GPS', () => {
+  it('без точки или без GPS — null', () => {
+    expect(locationOffsetM({ point: null, gps })).toBeNull()
+    expect(locationOffsetM({ point: draft.point, gps: null })).toBeNull()
   })
 
-  it('принимает запятую и точку', () => {
-    expect(parseWellDepth('1,5')).toEqual({ ok: true, value: 1.5 })
-    expect(parseWellDepth('2.25')).toEqual({ ok: true, value: 2.3 })
+  it('совпадающие точки — ноль', () => {
+    expect(locationOffsetM({ point: { lat: gps.lat, lng: gps.lng }, gps })).toBe(0)
   })
 
-  it('округляет до 0.1 м', () => {
-    expect(parseWellDepth('0.04')).toEqual({ ok: true, value: 0 })
-  })
-
-  it('ноль — допустимое значение', () => {
-    expect(parseWellDepth('0')).toEqual({ ok: true, value: 0 })
-  })
-
-  it('текст — не число', () => {
-    expect(parseWellDepth('глубоко')).toEqual({ ok: false, error: 'not_number' })
-    expect(parseWellDepth('1.5 м')).toEqual({ ok: false, error: 'not_number' })
-  })
-
-  it('отрицательная глубина отклоняется', () => {
-    expect(parseWellDepth('-1')).toEqual({ ok: false, error: 'negative' })
-  })
-
-  it('больше 50 м отклоняется', () => {
-    expect(parseWellDepth('51')).toEqual({ ok: false, error: 'too_deep' })
+  it('0,001° по широте — около 111 м', () => {
+    const offset = locationOffsetM({ point: { lat: 42.34893, lng: 76.1669 }, gps })
+    expect(offset).toBeGreaterThan(110)
+    expect(offset).toBeLessThan(112)
   })
 })
 
@@ -51,89 +51,100 @@ describe('submissionBlock: чего не хватает для отправки'
   })
 
   it('нет координат — блокирует', () => {
-    expect(submissionBlock({ ...draft, point: null, accuracyM: null })).toBe('location')
+    expect(submissionBlock({ ...draft, point: null })).toBe('location')
   })
 
-  it('не отвечено про подвал — блокирует', () => {
-    expect(submissionBlock({ ...draft, waterInBasement: null })).toBe('basement')
+  it('нет GPS-фикса — блокирует: сдвиг нечем проверить', () => {
+    expect(submissionBlock({ ...draft, gps: null })).toBe('location')
   })
 
-  it('глубина не число — блокирует', () => {
-    expect(submissionBlock({ ...draft, wellDepthRaw: 'abc' })).toBe('well_depth')
+  it('категория не выбрана — блокирует', () => {
+    expect(submissionBlock({ ...draft, category: null })).toBe('category')
   })
 
-  it('пин унесён дальше 2 км — блокирует', () => {
-    expect(submissionBlock({ ...draft, gpsOffsetM: 2_500 })).toBe('pin_far')
+  it('комментарий длиннее 500 символов — блокирует', () => {
+    expect(submissionBlock({ ...draft, comment: 'а'.repeat(501) })).toBe('comment')
+    expect(submissionBlock({ ...draft, comment: 'а'.repeat(500) })).toBeNull()
   })
 
-  it('пин в пределах 2 км — не блокирует', () => {
-    expect(submissionBlock({ ...draft, gpsOffsetM: 1_999 })).toBeNull()
+  it('пин унесён дальше 300 м — блокирует', () => {
+    // 0,003° по широте ≈ 333 м.
+    expect(submissionBlock({ ...draft, point: { lat: 42.35093, lng: 76.1669 } })).toBe('pin_far')
+  })
+
+  it('пин в пределах 300 м — не блокирует', () => {
+    expect(submissionBlock({ ...draft, point: { lat: 42.3499, lng: 76.1669 } })).toBeNull()
   })
 })
 
-describe('buildSubmitPayload: тело запроса', () => {
+describe('buildSubmitPayload: тело запроса v2.0', () => {
   it('собирает контракт без фото', () => {
     const result = buildSubmitPayload(draft)
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(result.payload).toMatchObject({
+    expect(result.payload).toEqual({
+      contract_version: '2.0',
       client_id: draft.clientId,
-      lat: 42.34793,
-      lng: 76.1669,
-      accuracy_m: 12,
-      water_in_basement: true,
-      well_depth_m: 1.5,
+      device_hash: draft.deviceHash,
+      category: 'basement_water',
+      comment: 'Вода в подвале с ночи',
+      immediate_danger: false,
+      point: draft.point,
+      gps: { lat: gps.lat, lng: gps.lng, accuracy_m: gps.accuracyM },
       photo_path: null,
-      risk_level: null,
-      findings: [],
-      captured_at: null,
-      mode: 'resident',
+      weather_snapshot: null,
     })
   })
 
-  it('переносит AI-оценку из сканера', () => {
+  it('пустой комментарий уходит как null', () => {
+    const result = buildSubmitPayload({ ...draft, comment: '   ' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.payload.comment).toBeNull()
+  })
+
+  it('обрезает пробелы по краям комментария', () => {
+    const result = buildSubmitPayload({ ...draft, comment: '  вода у стены  ' })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.payload.comment).toBe('вода у стены')
+  })
+
+  it('переносит отметку «опасно для жизни»', () => {
+    const result = buildSubmitPayload({ ...draft, immediateDanger: true })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.payload.immediate_danger).toBe(true)
+  })
+
+  it('переносит путь фото из сканера', () => {
     const result = buildSubmitPayload({
       ...draft,
-      waterInBasement: false,
-      wellDepthRaw: '',
-      photo: {
-        photoPath: '22222222-2222-4222-8222-222222222222/6f1d7a5e-0000-4000-8000-000000000000.jpg',
-        riskLevel: 'high',
-        confidence: 0.82,
-        findings: ['Тёмное пятно у плинтуса'],
-        recommendations: ['Проветрить помещение'],
-      },
+      photoPath: '22222222-2222-4222-8222-222222222222/6f1d7a5e-0000-4000-8000-000000000000.jpg',
     })
     expect(result.ok).toBe(true)
     if (!result.ok) return
-    expect(result.payload).toMatchObject({
-      water_in_basement: false,
-      well_depth_m: null,
-      risk_level: 'high',
-      confidence: 0.82,
-      findings: ['Тёмное пятно у плинтуса'],
-      photo_path: '22222222-2222-4222-8222-222222222222/6f1d7a5e-0000-4000-8000-000000000000.jpg',
-    })
+    expect(result.payload.photo_path).toBe(
+      '22222222-2222-4222-8222-222222222222/6f1d7a5e-0000-4000-8000-000000000000.jpg',
+    )
   })
 
   it('не пропускает путь фото с чужим client_id', () => {
     const result = buildSubmitPayload({
       ...draft,
-      photo: {
-        photoPath: '33333333-3333-4333-8333-333333333333/6f1d7a5e-0000-4000-8000-000000000000.jpg',
-        riskLevel: 'high',
-        confidence: 0.8,
-        findings: [],
-        recommendations: [],
-      },
+      photoPath: '33333333-3333-4333-8333-333333333333/6f1d7a5e-0000-4000-8000-000000000000.jpg',
     })
     expect(result).toEqual({ ok: false, reason: 'invalid' })
   })
 
   it('возвращает причину блокировки вместо мусора', () => {
-    expect(buildSubmitPayload({ ...draft, waterInBasement: null })).toEqual({
+    expect(buildSubmitPayload({ ...draft, category: null })).toEqual({
       ok: false,
-      reason: 'basement',
+      reason: 'category',
+    })
+    expect(buildSubmitPayload({ ...draft, point: null })).toEqual({
+      ok: false,
+      reason: 'location',
     })
   })
 })

@@ -5,9 +5,14 @@
  * фикс остаётся, чтобы показать смещение («пин сдвинут на 40 м от GPS»).
  * Если геолокация запрещена — форму не блокируем: пин ставится вручную,
  * и это честно подписано на экране.
+ *
+ * Радиус уточнения — 300 м (§7.2): дальше метка не уезжает, даже если палец
+ * протащил её через полсела. Это первый уровень проверки; второй — сервер,
+ * третий — CHECK в БД.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import type { LatLng } from '../../../shared/lib/geo'
+import { clampPointToRadius, distanceMeters, type LatLng } from '../../../shared/lib/geo'
+import { MAX_LOCATION_ADJUST_M } from '../../../shared/types/report-contract'
 import {
   GeoError,
   geolocationAvailability,
@@ -27,6 +32,8 @@ export type GeolocationState = {
   /** Точка для отправки: GPS или поставленная вручную. */
   point: LatLng | null
   manual: boolean
+  /** true — последнее перетаскивание упёрлось в радиус 300 м. */
+  clamped: boolean
   code: GeoErrorCode | null
 }
 
@@ -35,6 +42,7 @@ const INITIAL: GeolocationState = {
   gps: null,
   point: null,
   manual: false,
+  clamped: false,
   code: null,
 }
 
@@ -52,7 +60,7 @@ export function useGeolocation() {
     try {
       const fix = await requestFix()
       if (runId !== runIdRef.current) return
-      setState({ status: 'ready', gps: fix, point: fix, manual: false, code: null })
+      setState({ status: 'ready', gps: fix, point: fix, manual: false, clamped: false, code: null })
 
       setRefining(true)
       try {
@@ -78,6 +86,7 @@ export function useGeolocation() {
         gps: null,
         point: null,
         manual: false,
+        clamped: false,
         code,
       })
     }
@@ -87,15 +96,16 @@ export function useGeolocation() {
     void locate()
   }, [locate])
 
-  /** Ручная установка/перетаскивание пина. */
+  /**
+   * Ручная установка/перетаскивание пина. Без GPS (разрешение запрещено) точку
+   * ставим как есть — сравнивать не с чем; с GPS держим в радиусе 300 м.
+   */
   const setManualPoint = useCallback((point: LatLng) => {
-    setState((prev) => ({
-      status: 'ready',
-      gps: prev.gps,
-      point,
-      manual: true,
-      code: prev.code,
-    }))
+    setState((prev) => {
+      const next = prev.gps ? clampPointToRadius(prev.gps, point, MAX_LOCATION_ADJUST_M) : point
+      const clamped = prev.gps !== null && distanceMeters(next, point) > 0.5
+      return { ...prev, status: 'ready', point: next, manual: true, clamped }
+    })
   }, [])
 
   return {

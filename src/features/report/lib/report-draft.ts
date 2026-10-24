@@ -1,62 +1,71 @@
 /**
- * Черновик отчёта → тело запроса `submit-report`.
+ * Черновик отчёта → тело запроса `submit-report` (контракт v2.0).
  *
- * Вся логика формы — чистые функции: что считается заполненным, как разобрать
- * глубину колодца и что именно уйдёт на сервер. Экран только собирает значения.
+ * Вся логика формы — чистые функции: что считается заполненным, сколько символов
+ * в комментарии и что именно уйдёт на сервер. Экран только собирает значения.
+ *
+ * Отличия от v1.0: категория обязательна, фото и глубина колодца — нет,
+ * координаты идут двумя парами (GPS + подтверждённая метка), сдвиг метки
+ * ограничен 300 м (`MAX_LOCATION_ADJUST_M`).
  */
-import { PIN_MAX_OFFSET_M, WELL_DEPTH_MAX_M } from '../../../config/report'
-import type { LatLng } from '../../../shared/lib/geo'
-import type { ReportContext } from '../../../shared/types/report-context'
+import { distanceMeters, type LatLng } from '../../../shared/lib/geo'
+import type { ReportCategory } from '../../../shared/lib/categories'
 import {
+  COMMENT_MAX_LENGTH,
+  MAX_LOCATION_ADJUST_M,
   REPORT_CONTRACT_VERSION,
   submitReportRequestSchema,
   type SubmitReportRequest,
 } from '../../../shared/types/report-contract'
 
+/** GPS-фикс формы: координаты + точность. Без фикса отправка невозможна (§7.2). */
+export type DraftGps = {
+  lat: number
+  lng: number
+  accuracyM: number
+}
+
 export type ReportDraft = {
+  /** id заявки; при переходе со сканера совпадает с папкой фото. */
   clientId: string
   deviceHash: string
+  /** Категория из словаря `REPORT_CATEGORIES`; null — ещё не выбрана. */
+  category: ReportCategory | null
+  /** Комментарий жителя (сырой ввод, обрезаем при сборке тела). */
+  comment: string
+  immediateDanger: boolean
   /** Точка на карте; null — координат ещё нет (отправка заблокирована). */
   point: LatLng | null
-  /** Точность GPS; null — точку поставили вручную, точность не измерена. */
-  accuracyM: number | null
-  waterInBasement: boolean | null
-  /** Сырой ввод поля «глубина воды в колодце»: '', '1,5', '2'. */
-  wellDepthRaw: string
-  /** Насколько пин сдвинут от GPS, метры. */
-  gpsOffsetM: number
-  photo: ReportContext | null
+  /** Исходный GPS-фикс: по нему сервер сам считает сдвиг метки. */
+  gps: DraftGps | null
+  /** Путь фото в бакете; null — отчёт без фото. */
+  photoPath: string | null
 }
 
-export type ReportBlock = 'location' | 'basement' | 'well_depth' | 'pin_far' | 'invalid'
-
-export type WellDepthResult =
-  | { ok: true; value: number | null }
-  | { ok: false; error: 'not_number' | 'too_deep' | 'negative' }
+export type ReportBlock = 'location' | 'category' | 'comment' | 'pin_far' | 'invalid'
 
 /**
- * Глубина из текстового поля: пусто — «не знаю» (null), запятая как разделитель,
- * округление до 0.1 м. Результат — метры.
+ * Длина комментария в символах, а не в UTF-16: `char_length` в Postgres и лимит
+ * 500 в CHECK считают символы, а эмодзи в JS занимает две единицы.
  */
-export function parseWellDepth(raw: string): WellDepthResult {
-  const trimmed = raw.trim().replace(',', '.')
-  if (trimmed === '') return { ok: true, value: null }
-  if (!/^-?\d+(\.\d+)?$/.test(trimmed)) return { ok: false, error: 'not_number' }
-
-  const parsed = Number(trimmed)
-  if (!Number.isFinite(parsed)) return { ok: false, error: 'not_number' }
-  if (parsed < 0) return { ok: false, error: 'negative' }
-  if (parsed > WELL_DEPTH_MAX_M) return { ok: false, error: 'too_deep' }
-
-  return { ok: true, value: Math.round(parsed * 10) / 10 }
+export function commentLength(comment: string): number {
+  return Array.from(comment).length
 }
 
-/** Хватает ли данных для кнопки «Отправить» — до нажатия, чтобы кнопка была активной честно. */
+/** Насколько метка сдвинута от GPS; null — нет точки или фикса. */
+export function locationOffsetM(draft: Pick<ReportDraft, 'point' | 'gps'>): number | null {
+  if (!draft.point || !draft.gps) return null
+  return distanceMeters(draft.gps, draft.point)
+}
+
+/** Хватает ли данных для кнопки «Отправить» — до нажатия, чтобы кнопка была честной. */
 export function submissionBlock(draft: ReportDraft): ReportBlock | null {
-  if (!draft.point) return 'location'
-  if (draft.waterInBasement === null) return 'basement'
-  if (!parseWellDepth(draft.wellDepthRaw).ok) return 'well_depth'
-  if (draft.gpsOffsetM > PIN_MAX_OFFSET_M) return 'pin_far'
+  if (!draft.point || !draft.gps) return 'location'
+  if (!draft.category) return 'category'
+  if (commentLength(draft.comment.trim()) > COMMENT_MAX_LENGTH) return 'comment'
+
+  const offset = locationOffsetM(draft)
+  if (offset !== null && offset > MAX_LOCATION_ADJUST_M) return 'pin_far'
   return null
 }
 
@@ -64,33 +73,26 @@ export type BuildResult =
   | { ok: true; payload: SubmitReportRequest }
   | { ok: false; reason: ReportBlock }
 
-export function buildSubmitPayload(draft: ReportDraft, mode: 'resident' | 'farmer' = 'resident'): BuildResult {
+export function buildSubmitPayload(draft: ReportDraft): BuildResult {
   const block = submissionBlock(draft)
   if (block) return { ok: false, reason: block }
+  if (!draft.point || !draft.gps || !draft.category) return { ok: false, reason: 'location' }
 
-  const wellDepth = parseWellDepth(draft.wellDepthRaw)
-  if (!wellDepth.ok) return { ok: false, reason: 'well_depth' }
-  if (!draft.point || draft.waterInBasement === null) {
-    return { ok: false, reason: 'location' }
-  }
+  const comment = draft.comment.trim()
 
   const payload = {
     contract_version: REPORT_CONTRACT_VERSION,
     client_id: draft.clientId,
     device_hash: draft.deviceHash,
-    lat: draft.point.lat,
-    lng: draft.point.lng,
-    accuracy_m: draft.accuracyM,
-    water_in_basement: draft.waterInBasement,
-    well_depth_m: wellDepth.value,
-    photo_path: draft.photo?.photoPath ?? null,
-    risk_level: draft.photo?.riskLevel ?? null,
-    confidence: draft.photo?.confidence ?? null,
-    findings: draft.photo?.findings ?? [],
-    recommendations: draft.photo?.recommendations ?? [],
-    // Время съёмки клиент достоверно не знает — сервер ставит created_at.
-    captured_at: null,
-    mode,
+    category: draft.category,
+    // Пустая строка и null — одно и то же («комментария нет»).
+    comment: comment === '' ? null : comment,
+    immediate_danger: draft.immediateDanger,
+    point: draft.point,
+    gps: { lat: draft.gps.lat, lng: draft.gps.lng, accuracy_m: draft.gps.accuracyM },
+    photo_path: draft.photoPath,
+    // Снимок погоды приходит в PR-3 (Open-Meteo) — пока null, поле контракта есть.
+    weather_snapshot: null,
   }
 
   const parsed = submitReportRequestSchema.safeParse(payload)

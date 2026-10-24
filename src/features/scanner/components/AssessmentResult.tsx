@@ -36,6 +36,7 @@ export function AssessmentResult({ result, clientId, onRescan }: AssessmentResul
   const ownPhotoPath = photoPath && photoPathClientId(photoPath) === clientId ? photoPath : null
 
   const reportState: ReportContext = {
+    clientId,
     photoPath: ownPhotoPath,
     riskLevel: assessment.risk_level,
     confidence: assessment.confidence,
