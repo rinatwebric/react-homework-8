@@ -6,7 +6,9 @@
 const LOCATION_NAME_KEY = 'suutech_user_location_name'
 
 export interface UserLocationName {
-  villageOrCity: string
+  placeName: string
+  placeType: 'city' | 'town' | 'village' | 'district'
+  typeLabelRu: string
   subdistrict?: string
   fullTitle: string
 }
@@ -57,20 +59,43 @@ export async function reverseGeocodeVillage(
     const addr = data.address
     if (!addr) return null
 
-    const place =
-      addr.village ||
-      addr.hamlet ||
-      addr.town ||
-      addr.city ||
-      addr.city_district ||
-      addr.suburb
+    let placeName = ''
+    let placeType: UserLocationName['placeType'] = 'village'
+    let typeLabelRu = 'Ваше село'
 
-    if (!place) return null
+    if (addr.city) {
+      placeName = addr.city
+      placeType = 'city'
+      typeLabelRu = 'Ваш город'
+    } else if (addr.town) {
+      placeName = addr.town
+      placeType = 'town'
+      typeLabelRu = 'Ваш город'
+    } else if (addr.village) {
+      placeName = addr.village
+      placeType = 'village'
+      typeLabelRu = 'Ваше село'
+    } else if (addr.hamlet) {
+      placeName = addr.hamlet
+      placeType = 'village'
+      typeLabelRu = 'Ваш аил'
+    } else if (addr.city_district || addr.suburb) {
+      placeName = addr.city_district || addr.suburb || ''
+      placeType = 'district'
+      typeLabelRu = 'Ваш район'
+    }
+
+    if (!placeName) return null
+
+    // Очистка от суффиксов вроде " шаары" если Nominatim выдал на кыргызском
+    const cleanPlaceName = placeName.replace(/\s+шаары$/i, '').trim()
 
     const result: UserLocationName = {
-      villageOrCity: place,
+      placeName: cleanPlaceName,
+      placeType,
+      typeLabelRu,
       subdistrict: addr.county || addr.city_district,
-      fullTitle: addr.county ? `${place} (${addr.county})` : place,
+      fullTitle: addr.county ? `${cleanPlaceName} (${addr.county})` : cleanPlaceName,
     }
 
     try {
