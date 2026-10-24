@@ -15,7 +15,7 @@ import type { WeatherSnapshot } from '../../shared/types/report-contract'
 import { useWeather } from '../weather/hooks/useWeather'
 import { CategoryPicker } from './components/CategoryPicker'
 import { CommentField } from './components/CommentField'
-import { DangerToggle } from './components/DangerToggle'
+import { RiskLevelSelector } from './components/RiskLevelSelector'
 import { LocationSection } from './components/LocationSection'
 import { PhotoField } from './components/PhotoField'
 import { ReportSent } from './components/ReportSent'
@@ -200,9 +200,12 @@ export function ReportPage() {
         onMove={setManualPoint}
       />
 
-      <Card className="space-y-3">
+      <Card className="space-y-4 p-4">
+        <RiskLevelSelector
+          value={immediateDanger}
+          onDangerChange={setImmediateDanger}
+        />
         <CommentField value={comment} onChange={setComment} />
-        <DangerToggle value={immediateDanger} onChange={setImmediateDanger} />
       </Card>
 
       {errorCode ? (

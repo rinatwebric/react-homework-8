@@ -184,7 +184,7 @@ export default function AdminPage() {
               SuuTech
             </Link>
             <span className="rounded-md border border-brand-bright/40 bg-brand-bright/20 px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase text-brand-bright">
-              Admin v2.0
+              Панель службы
             </span>
           </div>
 
