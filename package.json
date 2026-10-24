@@ -12,7 +12,9 @@
     "test:watch": "vitest",
     "preview": "vite preview --host",
     "assets": "pwa-assets-generator",
-    "verify:sql": "node scripts/verify-migration.mjs"
+    "verify:sql": "node scripts/verify-migration.mjs",
+    "db:prod:check": "node scripts/apply-prod-migration.mjs --check",
+    "db:prod:migrate": "node scripts/apply-prod-migration.mjs"
   },
   "dependencies": {
     "@fontsource-variable/golos-text": "^5.3.0",

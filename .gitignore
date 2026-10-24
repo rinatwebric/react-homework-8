@@ -32,6 +32,10 @@ dist-ssr
 supabase/.temp
 supabase/.branches
 
+# Supabase PAT для scripts/apply-prod-migration.mjs (Management API)
+.secrets/
+supabase-pat.txt
+
 # Hoplite attachments
 .hoplite/
 
