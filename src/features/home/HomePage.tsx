@@ -14,6 +14,11 @@ import { fetchRecentAlerts } from '../alerts/alerts-api'
 import type { AlertItem } from '../alerts/types'
 import { ActiveAlertBanner } from './components/ActiveAlertBanner'
 import { RecentAlertsList } from './components/RecentAlertsList'
+import {
+  countUnreadAlerts,
+  markAlertsAsSeen,
+  notifyNewAlerts,
+} from './lib/notification-service'
 import { RainWarningBanner } from '../weather/components/RainWarningBanner'
 import { useWeather } from '../weather/hooks/useWeather'
 
@@ -27,6 +32,7 @@ export function HomePage() {
   const { t } = useTranslation()
   const [alertsOpen, setAlertsOpen] = useState(false)
   const [alerts, setAlerts] = useState<AlertItem[]>([])
+  const [unreadCount, setUnreadCount] = useState<number>(0)
 
   const { weather } = useWeather({
     lat: PILOT_ZONE.center.lat,
@@ -39,12 +45,27 @@ export function HomePage() {
     void fetchRecentAlerts(48).then((data) => {
       if (isMounted) {
         setAlerts(data)
+        setUnreadCount(countUnreadAlerts(data))
+        // Если есть свежие алерты и включены уведомления — отправляем системное уведомление на телефон
+        void notifyNewAlerts(data)
       }
     })
     return () => {
       isMounted = false
     }
   }, [])
+
+  // При открытии списка оповещений сбрасываем счетчик и скрываем красный значок
+  const handleToggleAlerts = () => {
+    setAlertsOpen((prev) => {
+      const next = !prev
+      if (next) {
+        markAlertsAsSeen()
+        setUnreadCount(0)
+      }
+      return next
+    })
+  }
 
   // Расчёт фактического уровня риска подтопления на основе погоды в пилотной зоне
   const riskLevel: RiskLevel = useMemo(() => {
@@ -81,15 +102,17 @@ export function HomePage() {
           type="button"
           aria-label={t('home.bellLabel')}
           aria-expanded={alertsOpen}
-          onClick={() => setAlertsOpen((open) => !open)}
+          onClick={handleToggleAlerts}
           className="relative grid size-14 shrink-0 place-items-center rounded-2xl bg-card text-ink shadow-card transition-colors hover:bg-muted/40"
         >
           <Bell aria-hidden className="size-6" strokeWidth={2} />
-          {alerts.length > 0 && (
+          {unreadCount > 0 && (
             <span
-              title={`Оповещений: ${alerts.length}`}
-              className="absolute top-3 right-3 flex size-3 items-center justify-center rounded-full bg-rose-600 ring-2 ring-card"
-            />
+              title={`Непрочитанных оповещений: ${unreadCount}`}
+              className="absolute top-2.5 right-2.5 flex min-w-5 h-5 px-1 items-center justify-center rounded-full bg-rose-600 text-[10px] font-bold text-white ring-2 ring-card animate-in fade-in"
+            >
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
           )}
         </button>
       </header>

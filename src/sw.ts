@@ -70,6 +70,28 @@ registerRoute(
   }),
 )
 
+// Клик по системному уведомлению на телефоне/десктопе
+self.addEventListener('notificationclick', (event: NotificationEvent) => {
+  event.notification.close()
+  const notifData = event.notification.data as { url?: string } | undefined
+  const targetUrl = notifData?.url || '/'
+
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      // Если окно SuuTech уже открыто — переключаемся на него
+      for (const client of clientList) {
+        if ('focus' in client) {
+          return client.focus()
+        }
+      }
+      // Иначе открываем приложение
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(targetUrl)
+      }
+    }),
+  )
+})
+
 self.addEventListener('message', (event: ExtendableMessageEvent) => {
   const data: unknown = event.data
   if (typeof data === 'object' && data !== null && 'type' in data && data.type === 'SKIP_WAITING') {

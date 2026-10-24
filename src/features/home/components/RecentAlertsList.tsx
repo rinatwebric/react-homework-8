@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import type { AlertItem } from '../../alerts/types'
 import { Card } from '../../../shared/ui/Card'
 import { cx } from '../../../shared/lib/cx'
+import { requestNotificationPermissionAndWelcome } from '../lib/notification-service'
 
 interface RecentAlertsListProps {
   alerts: AlertItem[]
@@ -16,18 +17,9 @@ export function RecentAlertsList({ alerts }: RecentAlertsListProps) {
   )
 
   const handleEnablePush = async () => {
-    if (typeof window === 'undefined' || !('Notification' in window)) return
-    try {
-      const permission = await Notification.requestPermission()
-      if (permission === 'granted') {
-        setPushEnabled(true)
-        new Notification('SuuTech: Оповещения включены', {
-          body: 'Вы будете получать оперативные сигналы об опасности подтопления.',
-          icon: '/pwa-192x192.png',
-        })
-      }
-    } catch (err) {
-      console.warn('[notifications] Ошибка запроса прав:', err)
+    const granted = await requestNotificationPermissionAndWelcome()
+    if (granted) {
+      setPushEnabled(true)
     }
   }
 
