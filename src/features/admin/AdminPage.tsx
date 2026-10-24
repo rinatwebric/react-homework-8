@@ -1,5 +1,7 @@
 import {
+  Bell,
   Download,
+  FileText,
   LogOut,
   MapPin,
   RefreshCw,
@@ -27,6 +29,7 @@ import {
   filterReports,
   type ReportFilterOptions,
 } from './admin-utils'
+import { AdminAlertsTab } from './components/AdminAlertsTab'
 import { AdminFilterBar } from './components/AdminFilterBar'
 import { AdminKpiCards } from './components/AdminKpiCards'
 import { AdminLoginDialog } from './components/AdminLoginDialog'
@@ -40,6 +43,7 @@ export default function AdminPage() {
   // Состояние авторизации
   const [moderatorEmail, setModeratorEmail] = useState<string | null>(getStoredModeratorEmail())
   const [showLoginDialog, setShowLoginDialog] = useState<boolean>(false)
+  const [activeTab, setActiveTab] = useState<'reports' | 'alerts'>('reports')
 
   // Загрузка данных
   const [reports, setReports] = useState<ReportWithTriage[]>([])
@@ -277,55 +281,101 @@ export default function AdminPage() {
             </div>
           </header>
 
-          {/* Плашка ошибки загрузки */}
-          {loadError && (
-            <div className="rounded-2xl border border-rose-300 bg-rose-50 p-4 text-xs font-semibold text-rose-900 shadow-xs flex items-center justify-between">
-              <span>{loadError}</span>
-              <button
-                type="button"
-                onClick={() => loadData(false)}
-                className="rounded-lg bg-rose-200/80 px-2.5 py-1 text-xs font-bold text-rose-950 hover:bg-rose-300 transition-colors"
-              >
-                {t('common.retry', 'Повторить')}
-              </button>
-            </div>
-          )}
+          {/* Переключение вкладок: Заявки / Оповещения */}
+          <div className="flex items-center gap-2 border-b border-border pb-3">
+            <button
+              type="button"
+              onClick={() => setActiveTab('reports')}
+              className={cx(
+                'flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-colors',
+                activeTab === 'reports'
+                  ? 'bg-ink text-on-ink shadow-xs'
+                  : 'text-muted-foreground hover:bg-muted/60 hover:text-ink',
+              )}
+            >
+              <FileText className="size-4" />
+              <span>{t('admin.tabs.reports', 'Обращения жителей')}</span>
+              <span className="rounded-md bg-white/20 px-1.5 py-0.5 text-[10px] font-extrabold">
+                {reports.length}
+              </span>
+            </button>
 
-          {/* KPI Дашборд (4 карточки) */}
-          <AdminKpiCards
-            stats={kpiStats}
-            activeStatus={statusFilter}
-            onSelectStatus={setStatusFilter}
-          />
+            <button
+              type="button"
+              onClick={() => setActiveTab('alerts')}
+              className={cx(
+                'flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-colors',
+                activeTab === 'alerts'
+                  ? 'bg-ink text-on-ink shadow-xs'
+                  : 'text-muted-foreground hover:bg-muted/60 hover:text-ink',
+              )}
+            >
+              <Bell className="size-4" />
+              <span>{t('admin.tabs.alerts', 'Оповещения службы')}</span>
+            </button>
+          </div>
 
-          {/* Панель поиска и фильтров */}
-          <AdminFilterBar
-            status={statusFilter}
-            onStatusChange={setStatusFilter}
-            category={categoryFilter}
-            onCategoryChange={setCategoryFilter}
-            dangerOnly={dangerOnly}
-            onDangerOnlyChange={setDangerOnly}
-            search={searchQuery}
-            onSearchChange={setSearchQuery}
-            totalCount={reports.length}
-            filteredCount={filteredReports.length}
-          />
-
-          {/* Список заявок */}
-          {isLoading && reports.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-card p-12 text-center">
-              <RefreshCw className="size-6 animate-spin text-brand-deep" />
-              <p className="mt-3 text-xs font-semibold text-muted-foreground">
-                {t('common.loading', 'Загрузка обращений...')}
-              </p>
-            </div>
-          ) : (
-            <AdminReportList
-              reports={filteredReports}
-              selectedReportId={selectedReport?.id ?? null}
-              onSelectReport={setSelectedReport}
+          {activeTab === 'alerts' ? (
+            <AdminAlertsTab
+              onNotify={(type, title, message) => {
+                if (type === 'success') showSuccess(title, message)
+                else if (type === 'error') showError(title, message)
+                else showInfo(title, message)
+              }}
             />
+          ) : (
+            <>
+              {/* Плашка ошибки загрузки */}
+              {loadError && (
+                <div className="rounded-2xl border border-rose-300 bg-rose-50 p-4 text-xs font-semibold text-rose-900 shadow-xs flex items-center justify-between">
+                  <span>{loadError}</span>
+                  <button
+                    type="button"
+                    onClick={() => loadData(false)}
+                    className="rounded-lg bg-rose-200/80 px-2.5 py-1 text-xs font-bold text-rose-950 hover:bg-rose-300 transition-colors"
+                  >
+                    {t('common.retry', 'Повторить')}
+                  </button>
+                </div>
+              )}
+
+              {/* KPI Дашборд (4 карточки) */}
+              <AdminKpiCards
+                stats={kpiStats}
+                activeStatus={statusFilter}
+                onSelectStatus={setStatusFilter}
+              />
+
+              {/* Панель поиска и фильтров */}
+              <AdminFilterBar
+                status={statusFilter}
+                onStatusChange={setStatusFilter}
+                category={categoryFilter}
+                onCategoryChange={setCategoryFilter}
+                dangerOnly={dangerOnly}
+                onDangerOnlyChange={setDangerOnly}
+                search={searchQuery}
+                onSearchChange={setSearchQuery}
+                totalCount={reports.length}
+                filteredCount={filteredReports.length}
+              />
+
+              {/* Список заявок */}
+              {isLoading && reports.length === 0 ? (
+                <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-card p-12 text-center">
+                  <RefreshCw className="size-6 animate-spin text-brand-deep" />
+                  <p className="mt-3 text-xs font-semibold text-muted-foreground">
+                    {t('common.loading', 'Загрузка обращений...')}
+                  </p>
+                </div>
+              ) : (
+                <AdminReportList
+                  reports={filteredReports}
+                  selectedReportId={selectedReport?.id ?? null}
+                  onSelectReport={setSelectedReport}
+                />
+              )}
+            </>
           )}
         </div>
       </main>

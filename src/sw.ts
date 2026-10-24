@@ -1,16 +1,21 @@
 /// <reference lib="webworker" />
+import { CacheableResponsePlugin } from 'workbox-cacheable-response'
 import { clientsClaim } from 'workbox-core'
+import { ExpirationPlugin } from 'workbox-expiration'
 import {
   cleanupOutdatedCaches,
   createHandlerBoundToURL,
   precacheAndRoute,
 } from 'workbox-precaching'
 import { NavigationRoute, registerRoute } from 'workbox-routing'
+import { CacheFirst, NetworkFirst } from 'workbox-strategies'
 
 /**
- * Свой service worker (injectManifest). Пока — оболочка PWA:
- * precache + навигационный fallback на index.html.
- * В срезе 3 сюда добавятся кэш тайлов, Background Sync; в срезе 4 — push.
+ * Service Worker SuuTech (injectManifest):
+ * 1. Precache статических ресурсов приложения (SPA shell)
+ * 2. Runtime-кэширование тайлов карты OSM (CacheFirst, 14 дней, до 1500 тайлов)
+ * 3. Runtime-кэширование публичных меток карты reports_public (NetworkFirst, 3 с)
+ * 4. Навигационный fallback на index.html
  */
 declare const self: ServiceWorkerGlobalScope & {
   __WB_MANIFEST: Parameters<typeof precacheAndRoute>[0]
@@ -22,8 +27,43 @@ cleanupOutdatedCaches()
 
 precacheAndRoute(self.__WB_MANIFEST)
 
-// SPA-навигация: любой путь отдаёт index.html. Edge Functions Supabase живут на другом
-// домене, поэтому единственное исключение — служебный /functions/.
+// Кэширование тайлов OpenStreetMap (P0/P1 офлайн-карта пилота)
+registerRoute(
+  ({ url }) => url.hostname.endsWith('tile.openstreetmap.org'),
+  new CacheFirst({
+    cacheName: 'osm-tiles',
+    plugins: [
+      new CacheableResponsePlugin({
+        statuses: [0, 200],
+      }),
+      new ExpirationPlugin({
+        maxEntries: 1500,
+        maxAgeSeconds: 14 * 24 * 60 * 60, // 14 дней
+        purgeOnQuotaError: true,
+      }),
+    ],
+  }),
+)
+
+// Кэширование публичных данных карты для работы без сети (NetworkFirst, таймаут 3 с)
+registerRoute(
+  ({ url }) => url.pathname.includes('/rest/v1/reports_public'),
+  new NetworkFirst({
+    cacheName: 'reports-public-cache',
+    networkTimeoutSeconds: 3,
+    plugins: [
+      new CacheableResponsePlugin({
+        statuses: [0, 200],
+      }),
+      new ExpirationPlugin({
+        maxEntries: 50,
+        maxAgeSeconds: 24 * 60 * 60, // 24 часа
+      }),
+    ],
+  }),
+)
+
+// SPA-навигация: любой путь отдаёт index.html.
 registerRoute(
   new NavigationRoute(createHandlerBoundToURL('/index.html'), {
     denylist: [/^\/functions\//],

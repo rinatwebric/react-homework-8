@@ -237,6 +237,10 @@ await expectError(
 )
 check('anon читает alerts', alerts.rows.length === 1)
 await expectError(
+  'anon НЕ может вставлять alerts',
+  "insert into public.alerts (level, message, area) values ('warning', 'Опасность', 'Ак-Өлөң')",
+)
+await expectError(
   'anon НЕ может вставлять reports',
   "insert into public.reports (client_id) values ('33333333-3333-3333-3333-333333333333')",
 )
@@ -279,6 +283,9 @@ const updated = await db.query(
   "select status from public.reports_public where status = 'triaged'",
 )
 check('модератор меняет статус отчёта', updated.rows.length === 1)
+await db.exec("insert into public.alerts (level, message, area) values ('critical', 'Штормовое предупреждение', 'Ак-Өлөң')")
+const alertsCount = await db.query("select count(*)::int as n from public.alerts where level = 'critical'")
+check('модератор может создавать alert', alertsCount.rows[0].n === 1)
 const history = await db.query(
   'select from_status, to_status, changed_by from public.report_status_history',
 )
@@ -299,6 +306,10 @@ const denied = await db.query("update public.reports set status = 'resolved' ret
 check('не-модератор НЕ может менять статус', denied.rows.length === 0, `обновлено строк: ${denied.rows.length}`)
 const stillTriaged = await db.query("select count(*)::int as n from public.reports_public where status = 'triaged'")
 check('статус отчёта не изменился', stillTriaged.rows[0].n === 1)
+await expectError(
+  'не-модератор НЕ может вставлять alerts',
+  "insert into public.alerts (level, message, area) values ('info', 'Тест не-модератор', 'Зона')",
+)
 await db.exec('reset role')
 
 const failed = results.filter((r) => !r.ok)
