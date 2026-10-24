@@ -27,9 +27,12 @@
 
 ## Осталось (нужен человек / прод)
 
-- [ ] Применить аддитивную миграцию `20261024190000_reports_v2_triage` на прод (без неё функция упадёт
-      на несуществующих колонках `category_user`, `location_adjusted_m`, `weather_snapshot`).
-- [ ] Задеплоить `submit-report` v4 (`npx supabase functions deploy submit-report`) после миграции.
+- [x] Миграция `20261024190000_reports_v2_triage` применена на прод 24.10.2026: версия записана в
+      `supabase_migrations.schema_migrations`, на месте колонки `category_user`, `location_adjusted_m`,
+      `weather_snapshot`, `device_hash`, `immediate_danger`, `moderator_note` и CHECK `reports_category_user_check`.
+- [x] `submit-report` задеплоена: версия 4, `ACTIVE`, `verify_jwt: true`. Смоук v2.0-контрактом:
+      заявка создана (200, `duplicate: false`), `zone_id = kg-issyk-ton-ak-olong` проставлен,
+      `location_adjusted_m = 27.7` посчитан сервером, тестовая строка удалена.
 - [ ] Смоук с телефона: `/report` без фото → категория + пин в радиусе 300 м → отчёт виден модератору,
       на карте после `triaged`.
 - [ ] `ky.json` — `TODO-ky` ключи `report.*` (перевод проверяет носитель языка).
