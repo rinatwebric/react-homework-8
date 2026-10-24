@@ -97,14 +97,24 @@ self.addEventListener('push', (event: PushEvent) => {
     }
   }
 
+  const isEmergency =
+    tag.includes('critical') ||
+    title.toLowerCase().includes('чс') ||
+    title.toLowerCase().includes('опасность') ||
+    title.toLowerCase().includes('внимание')
+
+  const options: NotificationOptions & { vibrate?: number[] } = {
+    body,
+    icon: '/pwa-192x192.png',
+    badge: '/pwa-192x192.png',
+    vibrate: isEmergency ? [300, 100, 300, 100, 300] : [200, 100, 200],
+    requireInteraction: isEmergency,
+    tag,
+    data: { url },
+  }
+
   event.waitUntil(
-    self.registration.showNotification(title, {
-      body,
-      icon: '/pwa-192x192.png',
-      badge: '/pwa-192x192.png',
-      tag,
-      data: { url },
-    }),
+    self.registration.showNotification(title, options as NotificationOptions),
   )
 })
 

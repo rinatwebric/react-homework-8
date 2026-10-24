@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { createAlert, fetchAllAlerts } from '../../alerts/alerts-api'
+import { createAlert, fetchAllAlerts, sendPushBroadcast } from '../../alerts/alerts-api'
 import type { AlertItem, AlertLevel } from '../../alerts/types'
 import { Button } from '../../../shared/ui/Button'
 import { Card } from '../../../shared/ui/Card'
@@ -37,29 +37,38 @@ export function AdminAlertsTab({ onNotify }: AdminAlertsTabProps) {
   const handleSendTestPush = async () => {
     setIsTestingPush(true)
     try {
-      if (typeof window !== 'undefined' && 'Notification' in window) {
-        if (Notification.permission !== 'granted') {
-          const perm = await Notification.requestPermission()
-          if (perm !== 'granted') {
-            onNotify('error', t('admin.alerts.pushPermissionDenied', 'Разрешение на уведомления отклонено в браузере'))
-            return
-          }
-        }
+      const token = await getValidModeratorToken().catch(() => getStoredModeratorToken())
 
-        const sent = await showSystemNotification('⚠️ SuuTech ТЕСТ: Угроза подтопления', {
+      // 1. Отправляем реальный Web Push через Edge Function на все подписанные мобильные устройства
+      const pushRes = await sendPushBroadcast({
+        title: '⚠️ SuuTech ТЕСТ: Угроза подтопления',
+        message: 'Учебная тревога: подъем уровня грунтовых вод в селе Ак-Өлөң. Проверьте подвалы.',
+        level: 'warning',
+        area: 'с. Ак-Өлөң',
+        token,
+      })
+
+      // 2. Локальное уведомление на текущем экране модератора (для немедленного отклика в UI)
+      if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+        void showSystemNotification('⚠️ SuuTech ТЕСТ: Угроза подтопления', {
           body: 'Учебная тревога: подъем уровня грунтовых вод в селе Ак-Өлөң. Проверьте подвалы.',
           tag: `test-push-${Date.now()}`,
           data: { url: '/' },
         })
-
-        if (sent) {
-          onNotify('success', t('admin.alerts.testPushSent', 'Тестовое уведомление доставлено на устройство'))
-        } else {
-          onNotify('error', t('admin.alerts.testPushFailed', 'Не удалось отобразить уведомление (проверьте настройки PWA)'))
-        }
-      } else {
-        onNotify('error', t('admin.alerts.pushNotSupported', 'Push-уведомления не поддерживаются в этом браузере'))
       }
+
+      if (pushRes.sent > 0) {
+        onNotify(
+          'success',
+          t('admin.alerts.testPushSent', 'Тестовое уведомление доставлено на устройство'),
+          `Отправлено на устройств: ${pushRes.sent}`,
+        )
+      } else {
+        onNotify('info', t('admin.alerts.testPushSent', 'Тестовое уведомление доставлено на устройство'))
+      }
+    } catch (err) {
+      console.warn('[admin-alerts] Ошибка отправки теста:', err)
+      onNotify('error', t('admin.alerts.testPushFailed', 'Не удалось отправить тестовое уведомление'))
     } finally {
       setIsTestingPush(false)
     }
@@ -106,15 +115,25 @@ export function AdminAlertsTab({ onNotify }: AdminAlertsTabProps) {
         token,
       )
 
+      // Отправляем реальный Web Push всем жителям (сработает даже при закрытом приложении)
+      const pushRes = await sendPushBroadcast({
+        title: `SuuTech: ${t(`alerts.levels.${level}`)}`,
+        message: created.message,
+        level: created.level,
+        area: created.area || undefined,
+        token,
+      })
+
+      const recipientInfo = pushRes.sent > 0 ? ` (доставлено: ${pushRes.sent})` : ''
       onNotify(
         'success',
-        t('admin.alerts.sentSuccess', 'Предупреждение отправлено'),
+        t('admin.alerts.sentSuccess', 'Предупреждение отправлено') + recipientInfo,
         `${t(`alerts.levels.${level}`)}: ${created.area ?? ''}`,
       )
       setMessage('')
       await loadAlerts()
 
-      // Также пытаемся отправить локальное мобильное уведомление на текущем устройстве
+      // Также показываем уведомление локально
       await showSystemNotification(`SuuTech: ${t(`alerts.levels.${level}`)}`, {
         body: `${created.area ? `[${created.area}] ` : ''}${created.message}`,
         tag: created.id,

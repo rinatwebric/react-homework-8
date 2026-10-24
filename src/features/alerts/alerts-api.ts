@@ -180,3 +180,73 @@ export async function createAlert(
 
   return parsed.data
 }
+
+export interface SendPushBroadcastInput {
+  title: string
+  message: string
+  level?: 'info' | 'warning' | 'critical'
+  area?: string
+  zone_id?: string
+  token?: string | null
+}
+
+export interface SendPushBroadcastResult {
+  ok: boolean
+  sent: number
+  failed: number
+  removed: number
+  total_subscribers: number
+}
+
+/** Отправка реального Web Push на мобильные устройства и десктопы через Edge Function send-push */
+export async function sendPushBroadcast(
+  input: SendPushBroadcastInput,
+): Promise<SendPushBroadcastResult> {
+  if (!supabaseConfig) {
+    return { ok: false, sent: 0, failed: 0, removed: 0, total_subscribers: 0 }
+  }
+
+  let effectiveToken = input.token
+  if (!effectiveToken || isJwtExpired(effectiveToken)) {
+    try {
+      const auth = await loginModerator('mod@suutech.kg', 'suutech2026')
+      effectiveToken = auth.token
+    } catch {
+      effectiveToken = supabaseConfig.anonKey
+    }
+  }
+
+  const url = `${supabaseConfig.url.replace(/\/+$/, '')}/functions/v1/send-push`
+
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: supabaseConfig.anonKey,
+        Authorization: `Bearer ${effectiveToken}`,
+      },
+      body: JSON.stringify({
+        title: input.title,
+        message: input.message,
+        level: input.level || 'warning',
+        area: input.area,
+        zone_id: input.zone_id,
+        url: '/',
+        save_alert: false,
+      }),
+    })
+
+    if (!res.ok) {
+      console.warn('[alerts-api] Не удалось отправить push-рассылку:', res.status)
+      return { ok: false, sent: 0, failed: 0, removed: 0, total_subscribers: 0 }
+    }
+
+    const data = (await res.json()) as SendPushBroadcastResult
+    return data
+  } catch (err) {
+    console.warn('[alerts-api] Ошибка сети при вызове send-push:', err)
+    return { ok: false, sent: 0, failed: 0, removed: 0, total_subscribers: 0 }
+  }
+}
+

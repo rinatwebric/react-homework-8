@@ -5,6 +5,10 @@ import {
   getAlertsLastSeen,
   notifyNewAlerts,
   showSystemNotification,
+  urlBase64ToUint8Array,
+  isPushSubscribed,
+  subscribeToPushNotifications,
+  VAPID_PUBLIC_KEY,
 } from './notification-service'
 import type { AlertItem } from '../../alerts/types'
 
@@ -160,6 +164,94 @@ describe('notification-service', () => {
           icon: '/pwa-192x192.png',
         }),
       )
+    })
+  })
+
+  describe('urlBase64ToUint8Array', () => {
+    it('корректно преобразует base64url в Uint8Array', () => {
+      const arr = urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      expect(arr).toBeInstanceOf(Uint8Array)
+      expect(arr.length).toBe(65)
+      expect(arr[0]).toBe(4) // uncompressed P-256 public key prefix 0x04
+    })
+  })
+
+  describe('isPushSubscribed', () => {
+    it('возвращает false при отсутствии поддержки PushManager', async () => {
+      const result = await isPushSubscribed()
+      expect(result).toBe(false)
+    })
+
+    it('возвращает true если подписка существует', async () => {
+      // @ts-ignore
+      globalThis.PushManager = {}
+      // @ts-ignore
+      globalThis.window.PushManager = {}
+      // @ts-ignore
+      globalThis.Notification = { permission: 'granted' }
+      // @ts-ignore
+      globalThis.window.Notification = { permission: 'granted' }
+      vi.stubGlobal('navigator', {
+        serviceWorker: {
+          ready: Promise.resolve({
+            pushManager: {
+              getSubscription: vi.fn().mockResolvedValue({ endpoint: 'https://push.example.com' }),
+            },
+          }),
+        },
+      })
+
+      const result = await isPushSubscribed()
+      expect(result).toBe(true)
+    })
+  })
+
+  describe('subscribeToPushNotifications', () => {
+    it('возвращает false, если пользователь отклонил запрос разрешений', async () => {
+      // @ts-ignore
+      globalThis.Notification = {
+        requestPermission: vi.fn().mockResolvedValue('denied'),
+      }
+
+      const result = await subscribeToPushNotifications()
+      expect(result).toBe(false)
+    })
+
+    it('успешно подписывает на PushManager при выданном разрешении', async () => {
+      const mockSub = {
+        endpoint: 'https://push.test/sub-123',
+        toJSON: () => ({ endpoint: 'https://push.test/sub-123', keys: { p256dh: 'abc', auth: 'def' } }),
+      }
+      const subscribeMock = vi.fn().mockResolvedValue(mockSub)
+      const showNotifMock = vi.fn().mockResolvedValue(undefined)
+
+      // @ts-ignore
+      globalThis.PushManager = {}
+      // @ts-ignore
+      globalThis.window.PushManager = {}
+      const notifMock = {
+        requestPermission: vi.fn().mockResolvedValue('granted'),
+        permission: 'granted',
+      }
+      // @ts-ignore
+      globalThis.Notification = notifMock
+      // @ts-ignore
+      globalThis.window.Notification = notifMock
+      vi.stubGlobal('navigator', {
+        serviceWorker: {
+          ready: Promise.resolve({
+            pushManager: {
+              getSubscription: vi.fn().mockResolvedValue(null),
+              subscribe: subscribeMock,
+            },
+            showNotification: showNotifMock,
+          }),
+        },
+      })
+
+      const result = await subscribeToPushNotifications({ lat: 42.13, lng: 76.88 })
+      expect(result).toBe(true)
+      expect(subscribeMock).toHaveBeenCalledTimes(1)
     })
   })
 })

@@ -1,10 +1,13 @@
-import { AlertOctagon, AlertTriangle, Bell, Check, Info } from 'lucide-react'
-import { useState } from 'react'
+import { AlertOctagon, AlertTriangle, Bell, Check, Info, Loader2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { AlertItem } from '../../alerts/types'
 import { Card } from '../../../shared/ui/Card'
 import { cx } from '../../../shared/lib/cx'
-import { requestNotificationPermissionAndWelcome } from '../lib/notification-service'
+import {
+  isPushSubscribed,
+  subscribeToPushNotifications,
+} from '../lib/notification-service'
 
 interface RecentAlertsListProps {
   alerts: AlertItem[]
@@ -15,11 +18,28 @@ export function RecentAlertsList({ alerts }: RecentAlertsListProps) {
   const [pushEnabled, setPushEnabled] = useState<boolean>(
     typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted',
   )
+  const [isSubscribing, setIsSubscribing] = useState<boolean>(false)
+
+  useEffect(() => {
+    // Если пользователь уже разрешил уведомления, гарантируем регистрацию в PushManager и Edge Function
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+      void isPushSubscribed().then((subscribed) => {
+        if (!subscribed) {
+          void subscribeToPushNotifications()
+        }
+      })
+    }
+  }, [])
 
   const handleEnablePush = async () => {
-    const granted = await requestNotificationPermissionAndWelcome()
-    if (granted) {
-      setPushEnabled(true)
+    setIsSubscribing(true)
+    try {
+      const granted = await subscribeToPushNotifications()
+      if (granted) {
+        setPushEnabled(true)
+      }
+    } finally {
+      setIsSubscribing(false)
     }
   }
 
@@ -103,9 +123,17 @@ export function RecentAlertsList({ alerts }: RecentAlertsListProps) {
             <button
               type="button"
               onClick={handleEnablePush}
-              className="w-full text-center rounded-xl bg-muted/70 hover:bg-muted py-2 text-xs font-semibold text-ink transition-colors"
+              disabled={isSubscribing}
+              className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-muted/70 hover:bg-muted py-2 text-xs font-semibold text-ink transition-colors disabled:opacity-50"
             >
-              {t('alerts.enablePush', 'Включить уведомления на телефоне')}
+              {isSubscribing ? (
+                <>
+                  <Loader2 className="size-3.5 animate-spin" />
+                  <span>{t('states.loading', 'Подключение…')}</span>
+                </>
+              ) : (
+                <span>{t('alerts.enablePush', 'Включить уведомления на телефоне')}</span>
+              )}
             </button>
           )}
         </div>
