@@ -2,8 +2,8 @@ import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { cx } from '../../../shared/lib/cx'
 import {
+  CATEGORY_FILTERS,
   PERIOD_FILTERS,
-  RISK_FILTERS,
   STATUS_FILTERS,
   hasActiveFilters,
   type MapFilters,
@@ -41,7 +41,7 @@ type MapFiltersBarProps = {
 }
 
 /**
- * Фильтры карты: риск отчёта, период, статус. Горизонтальная прокрутка — на телефоне
+ * Фильтры карты: категория отчёта, период, статус. Горизонтальная прокрутка — на телефоне
  * чипы не должны ломаться в три строки и отжимать карту.
  */
 export function MapFiltersBar({ filters, onChange }: MapFiltersBarProps) {
@@ -50,13 +50,13 @@ export function MapFiltersBar({ filters, onChange }: MapFiltersBarProps) {
   return (
     <section aria-label={t('map.filtersLabel')} className="space-y-2">
       <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
-        {RISK_FILTERS.map((value) => (
+        {CATEGORY_FILTERS.map((value) => (
           <Chip
             key={value}
-            active={filters.risk === value}
-            onClick={() => onChange({ ...filters, risk: value })}
+            active={filters.category === value}
+            onClick={() => onChange({ ...filters, category: value })}
           >
-            {t(`map.risk.${value}`)}
+            {value === 'all' ? t('map.category.all') : t(`report.categories.${value}`)}
           </Chip>
         ))}
       </div>
@@ -87,7 +87,7 @@ export function MapFiltersBar({ filters, onChange }: MapFiltersBarProps) {
       {hasActiveFilters(filters) ? (
         <button
           type="button"
-          onClick={() => onChange({ ...filters, risk: 'all', period: 'all', status: 'all' })}
+          onClick={() => onChange({ ...filters, category: 'all', period: 'all', status: 'all' })}
           className="text-sm font-semibold text-brand underline-offset-2 hover:underline"
         >
           {t('map.reset')}

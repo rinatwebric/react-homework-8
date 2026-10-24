@@ -1,6 +1,6 @@
-import type { ResidentRiskLevel } from '../../../config/risk'
 import { Marker, Popup } from 'react-leaflet'
 import MarkerClusterGroup from 'react-leaflet-cluster'
+import { REPORT_CATEGORIES, type ReportCategory } from '../../../shared/lib/categories'
 import { createClusterIcon, createReportIcon } from '../lib/report-icon'
 import type { MapReport } from '../lib/report-row'
 import { ReportPopup } from './ReportPopup'
@@ -9,11 +9,18 @@ import { ReportPopup } from './ReportPopup'
  * Иконки создаём один раз: Leaflet держит DOM-узел на каждый divIcon, а метки
  * перерисовываются при каждом изменении фильтров.
  */
-const REPORT_ICONS: Record<ResidentRiskLevel | 'none', ReturnType<typeof createReportIcon>> = {
-  low: createReportIcon('low'),
-  medium: createReportIcon('medium'),
-  high: createReportIcon('high'),
-  none: createReportIcon(null),
+const REPORT_ICONS: Record<string, ReturnType<typeof createReportIcon>> = {}
+
+for (const cat of REPORT_CATEGORIES) {
+  REPORT_ICONS[`${cat}:normal`] = createReportIcon(cat, false)
+  REPORT_ICONS[`${cat}:danger`] = createReportIcon(cat, true)
+}
+REPORT_ICONS['none:normal'] = createReportIcon(null, false)
+REPORT_ICONS['none:danger'] = createReportIcon(null, true)
+
+function getIcon(category: ReportCategory | null, danger: boolean) {
+  const key = `${category ?? 'none'}:${danger ? 'danger' : 'normal'}`
+  return REPORT_ICONS[key] ?? createReportIcon(category, danger)
 }
 
 /**
@@ -33,9 +40,9 @@ export function ReportMarkers({ reports }: { reports: MapReport[] }) {
         <Marker
           key={report.id}
           position={[report.lat_public, report.lng_public]}
-          icon={REPORT_ICONS[report.risk_level ?? 'none']}
+          icon={getIcon(report.category_user, report.immediate_danger)}
         >
-          <Popup minWidth={200} maxWidth={260}>
+          <Popup minWidth={220} maxWidth={280}>
             <ReportPopup report={report} />
           </Popup>
         </Marker>

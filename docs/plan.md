@@ -84,10 +84,12 @@
       `VITE_FF_WATER_VOLUME`, пункты навигации и плитки, i18n-ключи `scan`/`water`, `docs/ai-test-photos.md`.
       Фото осталось необязательным вложением заявки (`photo_path` + бакет `report-photos`).
       Плитка «разместить фото» на `/map` ведёт на живой `/report` вместо удалённого `/scan`.
-- [ ] Осталось в PR-5: режим фермера, Premium, `zone_risk`, legacy-колонки `reports`
-      (`risk_level`, `confidence`, `findings`, `recommendations`, `water_in_basement`, `well_depth_m`,
-      `mode`, `photo_sha256`), `status = 'reviewed'`, показ риска v1.0 на карте — только когда
-      карта перестанет их читать.
+- [x] Второй шаг очистки (PR-6): удалены legacy-колонки `reports` (`risk_level`, `confidence`, `findings`,
+      `recommendations`, `water_in_basement`, `well_depth_m`, `mode`, `photo_sha256`), статус `'reviewed'`,
+      индекс `reports_risk_level_idx` (миграция `20261025140000_drop_reports_v1_legacy.sql`);
+      `reports_public` пересобран на v2-поля; `ReportPopup`, `ReportMarkers` и `MapFiltersBar` переведены
+      на категории (`CATEGORY_META`), опасность и статусы v2; удалены 2 тестовые строки на проде.
+- [ ] Осталось в v1.0: режим фермера, Premium, `zone_risk` (слой-ориентир).
 - `docs/pitch.md` и сценарий демо синхронизируются с фактическим UI.
 
 ## Риски и как их снимаем
