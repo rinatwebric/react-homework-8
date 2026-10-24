@@ -100,7 +100,7 @@ async function countRecentReports(
     .gte('created_at', since)
 
   if (error) {
-    // Не блокируем жителя из-за сбоя БД: пишем в лог и пропускаем (как в analyze-photo).
+    // Не блокируем жителя из-за сбоя БД: пишем в лог и пропускаем.
     console.error(`[submit-report] лимит не проверен (${column}): ${error.message}`)
     return 0
   }

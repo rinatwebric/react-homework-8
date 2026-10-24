@@ -79,12 +79,30 @@ check('фото в своей папке client_id принимается', ownP
 await db.exec(`
   delete from public.reports where client_id = '99999999-9999-4999-8999-999999999999'`)
 
+// PR-5 (удаление v1.0): кэш оценок жил только для Edge Function `analyze-photo`
+// и удалён вместе со сканером — заявки живут в `reports`.
+const droppedTable = await db.query(`
+  select count(*)::int as n from information_schema.tables
+  where table_schema = 'public' and table_name = 'photo_assessments'`)
+check(
+  'таблица photo_assessments удалена',
+  droppedTable.rows[0].n === 0,
+  `таблиц с таким именем: ${droppedTable.rows[0].n}`,
+)
+const droppedGrants = await db.query(`
+  select count(*)::int as n from information_schema.role_table_grants
+  where table_schema = 'public' and table_name = 'photo_assessments'`)
+check(
+  'грантов на photo_assessments нет',
+  droppedGrants.rows[0].n === 0,
+  `грантов: ${droppedGrants.rows[0].n}`,
+)
+
 const TABLES_WITH_RLS = [
   'reports',
   'alerts',
   'push_subscriptions',
   'moderators',
-  'photo_assessments',
   'zone_risk',
   // ТЗ v2.0: AI-триаж и история статусов — только для модераторов
   'ai_triage',
@@ -105,16 +123,12 @@ const modId = '11111111-1111-1111-1111-111111111111'
 await db.exec(`
   insert into auth.users (id, email) values ('${modId}', 'mod@suutech.kg');
   insert into public.moderators (user_id) values ('${modId}');
-  insert into public.reports (client_id, lat, lng, risk_level, water_in_basement)
-  values ('22222222-2222-2222-2222-222222222222', 42.34793, 76.16690, 'high', true);
+  insert into public.reports (client_id, lat, lng, category_user, comment)
+  values ('22222222-2222-2222-2222-222222222222', 42.34793, 76.16690,
+          'basement_water', 'Вода в подвале с ночи');
   insert into public.zone_risk (zone_id, level, reasons)
   values ('92254566B71058624193805', 'elevated', array['demo']);
   insert into public.alerts (level, message, zone_id) values ('high', 'Тест', 'kg-ton');
-  insert into public.photo_assessments (sha256, client_id, status, assessment, model)
-  values (
-    repeat('a', 64), '44444444-4444-4444-4444-444444444444', 'ok',
-    '{"risk_level":"low","confidence":0.8}'::jsonb, 'gemini-test'
-  );
 `)
 
 // ТЗ v2.0: поля заявки (категория, комментарий, опасность, сдвиг метки, погода) + AI-триаж.
@@ -128,17 +142,6 @@ await db.exec(`
   insert into public.ai_triage (report_id, category_ai, urgency_ai, summary, confidence)
   select id, 'drainage_issue', 'high', 'Стоячая вода у арыка', 0.72 from public.reports limit 1;
 `)
-
-await expectError(
-  'ok-запись photo_assessments без assessment запрещена',
-  `insert into public.photo_assessments (sha256, client_id, status)
-   values (repeat('b', 64), '55555555-5555-5555-5555-555555555555', 'ok')`,
-)
-await expectError(
-  'один и тот же хэш фото не оценивается дважды',
-  `insert into public.photo_assessments (sha256, client_id, status)
-   values (repeat('a', 64), '66666666-6666-6666-6666-666666666666', 'ai_timeout')`,
-)
 
 const generated = await db.query('select lat, lat_public, lng_public from public.reports')
 check(
@@ -214,7 +217,7 @@ await expectError(
 await expectError('anon НЕ может менять status', "update public.reports set status = 'resolved'")
 await expectError('anon НЕ видит push_subscriptions', 'select * from public.push_subscriptions')
 await expectError(
-  'anon НЕ видит кэш AI-оценок',
+  'anon НЕ видит удалённую photo_assessments',
   'select * from public.photo_assessments',
 )
 await expectError('anon НЕ видит AI-триаж', 'select * from public.ai_triage')
