@@ -12,6 +12,7 @@ import { DemoTag } from '../../shared/ui/DemoTag'
 import { EmergencyCallButton } from '../../shared/ui/EmergencyCallButton'
 import { IconTile } from '../../shared/ui/IconTile'
 import { RiskScale } from '../../shared/ui/RiskScale'
+import { ActiveAlertBanner } from './components/ActiveAlertBanner'
 import { RainWarningBanner } from '../weather/components/RainWarningBanner'
 import { useWeather } from '../weather/hooks/useWeather'
 
@@ -50,6 +51,9 @@ export function HomePage() {
       </header>
 
       {alertsOpen ? <Banner tone="info">{t('home.bellNote')}</Banner> : null}
+
+      {/* Оперативное предупреждение службы (Срез 5, ТЗ v2.0 §13) */}
+      <ActiveAlertBanner />
 
       {/* Предупреждение о дожде при наличии риска */}
       {features.weather ? <RainWarningBanner weather={weather} /> : null}

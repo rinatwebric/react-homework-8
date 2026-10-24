@@ -7,10 +7,12 @@ type ReportSentProps = {
   reportId: string
   /** true — такой отчёт уже был отправлен ранее (повторное нажатие). */
   duplicate: boolean
+  /** true — отчёт сохранён в локальную очередь IndexedDB */
+  isOffline?: boolean
 }
 
 /** Экран после успешной отправки: видно, что отчёт в системе, и куда идти дальше. */
-export function ReportSent({ reportId, duplicate }: ReportSentProps) {
+export function ReportSent({ reportId, duplicate, isOffline = false }: ReportSentProps) {
   const { t } = useTranslation()
   const shortId = reportId.slice(0, 8).toUpperCase()
 
@@ -20,8 +22,14 @@ export function ReportSent({ reportId, duplicate }: ReportSentProps) {
         <span className="mx-auto grid size-14 place-items-center rounded-full bg-ink">
           <CheckCircle2 aria-hidden className="size-8 text-lime" strokeWidth={2.25} />
         </span>
-        <h2 className="text-lg font-bold text-ink">{t('report.sent.title')}</h2>
-        <p className="text-[15px] leading-snug text-muted-foreground">{t('report.sent.text')}</p>
+        <h2 className="text-lg font-bold text-ink">
+          {isOffline ? t('report.offline.title', 'Заявка сохранена офлайн') : t('report.sent.title')}
+        </h2>
+        <p className="text-[15px] leading-snug text-muted-foreground">
+          {isOffline
+            ? t('report.offline.text', 'Отчёт сохранён в памяти телефона и будет автоматически отправлен при появлении связи.')
+            : t('report.sent.text')}
+        </p>
         <p className="text-sm text-muted-foreground">
           {t('report.sent.idLabel')}: <span className="font-semibold text-ink">{shortId}</span>
         </p>

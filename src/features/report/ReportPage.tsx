@@ -28,6 +28,7 @@ import {
   type ReportDraft,
 } from './lib/report-draft'
 import { SubmitReportError, submitReport, type SubmitReportErrorCode } from './lib/submit-report'
+import { useOfflineQueue } from '../offline/hooks/useOfflineQueue'
 
 /**
  * Срез 2 & 3: заявка жителя v2.0 (§7, §10, §11).
@@ -52,7 +53,9 @@ export function ReportPage() {
   const [immediateDanger, setImmediateDanger] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [sent, setSent] = useState<{ id: string; duplicate: boolean } | null>(null)
+  const [offlineSent, setOfflineSent] = useState<{ id: string } | null>(null)
   const [errorCode, setErrorCode] = useState<SubmitReportErrorCode | null>(null)
+  const { enqueue } = useOfflineQueue()
 
   // Получаем погоду для текущей точки (Срез 3, §10)
   const { weather } = useWeather({
@@ -115,22 +118,61 @@ export function ReportPage() {
 
     setSubmitting(true)
     setErrorCode(null)
+
+    // Если сеть заведомо недоступна — сохраняем сразу в офлайн-очередь IndexedDB
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      try {
+        await enqueue(built.payload)
+        setOfflineSent({ id: built.payload.client_id })
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+      } catch (err) {
+        console.error('[report] Ошибка сохранения офлайн:', err)
+        setErrorCode('SERVER')
+      } finally {
+        setSubmitting(false)
+      }
+      return
+    }
+
     try {
       const response = await submitReport(built.payload)
       setSent(response)
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (error) {
+      // При сетевой ошибке или таймауте — автоматически сохраняем в офлайн-очередь
+      if (
+        error instanceof SubmitReportError &&
+        (error.code === 'NETWORK' || error.code === 'TIMEOUT')
+      ) {
+        try {
+          await enqueue(built.payload)
+          setOfflineSent({ id: built.payload.client_id })
+          window.scrollTo({ top: 0, behavior: 'smooth' })
+          return
+        } catch {
+          // fallback к стандартной ошибке
+        }
+      }
       setErrorCode(error instanceof SubmitReportError ? error.code : 'SERVER')
     } finally {
       setSubmitting(false)
     }
-  }, [deviceHash, draft])
+  }, [deviceHash, draft, enqueue])
 
   if (sent) {
     return (
       <div className="space-y-4">
         <ScreenHeader title={t('report.sentHeader')} />
         <ReportSent reportId={sent.id} duplicate={sent.duplicate} />
+      </div>
+    )
+  }
+
+  if (offlineSent) {
+    return (
+      <div className="space-y-4">
+        <ScreenHeader title={t('report.offlineHeader', 'Заявка сохранена')} />
+        <ReportSent reportId={offlineSent.id} duplicate={false} isOffline={true} />
       </div>
     )
   }

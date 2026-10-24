@@ -6,6 +6,7 @@
 import { CloudRain, Home, MapPin } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { NavLink, Outlet } from 'react-router-dom'
+import { NetworkStatusBar } from '../features/offline/components/NetworkStatusBar'
 import { cx } from '../shared/lib/cx'
 
 const NAV_ITEMS = [
@@ -20,6 +21,7 @@ export function Layout() {
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col">
       <main className="flex-1 px-4 pt-6 pb-28">
+        <NetworkStatusBar />
         <Outlet />
       </main>
 
