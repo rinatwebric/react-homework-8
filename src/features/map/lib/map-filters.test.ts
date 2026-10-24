@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import type { ReportCategory } from '../../../shared/lib/categories'
+import type { ReportStatus } from '../../../shared/types/database'
 import {
   DEFAULT_MAP_FILTERS,
   filterReports,
@@ -10,11 +12,18 @@ import {
 
 const NOW = new Date('2026-10-24T12:00:00Z')
 
-const daysAgo = (days: number) => new Date(NOW.getTime() - days * 24 * 60 * 60 * 1000).toISOString()
+const daysAgo = (days: number) =>
+  new Date(NOW.getTime() - days * 24 * 60 * 60 * 1000).toISOString()
 
-function report(overrides: Partial<{ risk_level: 'low' | 'medium' | 'high' | null; created_at: string; status: 'new' | 'reviewed' | 'in_progress' | 'resolved' }> = {}) {
+function report(
+  overrides: Partial<{
+    category_user: ReportCategory | null
+    created_at: string
+    status: ReportStatus
+  }> = {},
+) {
   return {
-    risk_level: 'high' as const,
+    category_user: 'basement_water' as const,
     created_at: daysAgo(1),
     status: 'new' as const,
     ...overrides,
@@ -27,15 +36,19 @@ describe('parseMapFilters', () => {
   })
 
   it('мусор в параметрах не ломает карту', () => {
-    const filters = parseMapFilters(new URLSearchParams('risk=huge&period=9999d&status=deleted'))
+    const filters = parseMapFilters(
+      new URLSearchParams('category=huge&period=9999d&status=reviewed'),
+    )
 
     expect(filters).toEqual(DEFAULT_MAP_FILTERS)
   })
 
   it('читает валидные параметры', () => {
-    const filters = parseMapFilters(new URLSearchParams('risk=medium&period=7d&status=resolved'))
+    const filters = parseMapFilters(
+      new URLSearchParams('category=standing_water&period=7d&status=resolved'),
+    )
 
-    expect(filters).toEqual({ risk: 'medium', period: '7d', status: 'resolved' })
+    expect(filters).toEqual({ category: 'standing_water', period: '7d', status: 'resolved' })
   })
 })
 
@@ -45,7 +58,7 @@ describe('serializeMapFilters', () => {
   })
 
   it('переживает круговой обход URL → фильтры → URL', () => {
-    const filters = { risk: 'high', period: '7d', status: 'new' } as const
+    const filters = { category: 'damp_wall', period: '7d', status: 'new' } as const
     const restored = parseMapFilters(serializeMapFilters(filters))
 
     expect(restored).toEqual(filters)
@@ -64,7 +77,13 @@ describe('isReportInPeriod', () => {
 
   it('граница 7 дней: ровно неделя назад — ещё видно, на минуту старше — нет', () => {
     expect(isReportInPeriod(daysAgo(7), '7d', NOW)).toBe(true)
-    expect(isReportInPeriod(new Date(NOW.getTime() - 7 * 24 * 60 * 60 * 1000 - 60_000).toISOString(), '7d', NOW)).toBe(false)
+    expect(
+      isReportInPeriod(
+        new Date(NOW.getTime() - 7 * 24 * 60 * 60 * 1000 - 60_000).toISOString(),
+        '7d',
+        NOW,
+      ),
+    ).toBe(false)
   })
 
   it('битую дату не показывает', () => {
@@ -74,26 +93,26 @@ describe('isReportInPeriod', () => {
 
 describe('filterReports', () => {
   const reports = [
-    report({ risk_level: 'high', status: 'new', created_at: daysAgo(2) }),
-    report({ risk_level: 'medium', status: 'reviewed', created_at: daysAgo(10) }),
-    report({ risk_level: null, status: 'new', created_at: daysAgo(40) }),
+    report({ category_user: 'basement_water', status: 'new', created_at: daysAgo(2) }),
+    report({ category_user: 'damp_wall', status: 'triaged', created_at: daysAgo(10) }),
+    report({ category_user: null, status: 'new', created_at: daysAgo(40) }),
   ]
 
   it('по умолчанию показывает свежие отчёты за 30 дней', () => {
     expect(filterReports(reports, DEFAULT_MAP_FILTERS, NOW)).toHaveLength(2)
   })
 
-  it('фильтр по риску оставляет только выбранный уровень', () => {
-    const result = filterReports(reports, { ...DEFAULT_MAP_FILTERS, risk: 'medium' }, NOW)
+  it('фильтр по категории оставляет только выбранную', () => {
+    const result = filterReports(reports, { ...DEFAULT_MAP_FILTERS, category: 'damp_wall' }, NOW)
 
     expect(result).toHaveLength(1)
-    expect(result[0]!.risk_level).toBe('medium')
+    expect(result[0]!.category_user).toBe('damp_wall')
   })
 
-  it('фильтры риска и статуса складываются', () => {
+  it('фильтры категории и статуса складываются', () => {
     const result = filterReports(
       reports,
-      { risk: 'high', period: 'all', status: 'reviewed' },
+      { category: 'basement_water', period: 'all', status: 'triaged' },
       NOW,
     )
 

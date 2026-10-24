@@ -98,6 +98,27 @@ check(
   `грантов: ${droppedGrants.rows[0].n}`,
 )
 
+// Задача №1 (удаление остатков v1.0): legacy-колонки и статус reviewed удалены
+const legacyCols = await db.query(`
+  select column_name from information_schema.columns
+  where table_schema = 'public' and table_name = 'reports'
+    and column_name in ('risk_level', 'confidence', 'findings', 'recommendations', 'water_in_basement', 'well_depth_m', 'mode', 'photo_sha256')`)
+check(
+  'legacy-колонки v1.0 удалены из reports',
+  legacyCols.rows.length === 0,
+  `колонок: ${legacyCols.rows.length}`,
+)
+
+const viewLegacyCols = await db.query(`
+  select column_name from information_schema.columns
+  where table_schema = 'public' and table_name = 'reports_public'
+    and column_name in ('risk_level', 'confidence', 'findings', 'recommendations', 'water_in_basement', 'well_depth_m', 'mode', 'photo_sha256')`)
+check(
+  'legacy-колонки v1.0 удалены из reports_public',
+  viewLegacyCols.rows.length === 0,
+  `колонок: ${viewLegacyCols.rows.length}`,
+)
+
 const TABLES_WITH_RLS = [
   'reports',
   'alerts',
@@ -164,10 +185,11 @@ const statusDef = await db.query(`
   select pg_get_constraintdef(oid) as def from pg_constraint
   where conname = 'reports_status_check'`)
 check(
-  'статусы §12 разрешены (triaged/assigned/rejected)',
+  'статусы §12 разрешены, а reviewed удалён',
   statusDef.rows[0].def.includes('triaged') &&
     statusDef.rows[0].def.includes('assigned') &&
-    statusDef.rows[0].def.includes('rejected'),
+    statusDef.rows[0].def.includes('rejected') &&
+    !statusDef.rows[0].def.includes('reviewed'),
   statusDef.rows[0].def,
 )
 await expectError(
@@ -185,6 +207,10 @@ await expectError(
 await expectError(
   'неизвестный статус отклоняется',
   "update public.reports set status = 'done'",
+)
+await expectError(
+  'устаревший статус reviewed отклоняется',
+  "update public.reports set status = 'reviewed'",
 )
 
 await db.exec('set role anon')
@@ -235,7 +261,9 @@ check(
   pubV2.rows[0].category_user === 'standing_water' &&
     pubV2.rows[0].immediate_danger === true &&
     !('created_by' in pubV2.rows[0]) &&
-    !('moderator_note' in pubV2.rows[0]),
+    !('moderator_note' in pubV2.rows[0]) &&
+    !('risk_level' in pubV2.rows[0]) &&
+    !('water_in_basement' in pubV2.rows[0]),
   JSON.stringify(Object.keys(pubV2.rows[0])),
 )
 await db.exec('reset role')
@@ -244,9 +272,9 @@ await db.exec(`select set_config('request.jwt.claim.sub', '${modId}', false)`)
 await db.exec('set role authenticated')
 const modRead = await db.query('select count(*)::int as n from public.reports_public')
 check('authenticated читает публичное представление', modRead.rows[0].n === 1)
-await db.exec("update public.reports set status = 'reviewed'")
+await db.exec("update public.reports set status = 'triaged'")
 const updated = await db.query(
-  "select status from public.reports_public where status = 'reviewed'",
+  "select status from public.reports_public where status = 'triaged'",
 )
 check('модератор меняет статус отчёта', updated.rows.length === 1)
 const history = await db.query(
@@ -256,7 +284,7 @@ check(
   'история статуса пишется триггером',
   history.rows.length === 1 &&
     history.rows[0].from_status === 'new' &&
-    history.rows[0].to_status === 'reviewed' &&
+    history.rows[0].to_status === 'triaged' &&
     history.rows[0].changed_by === modId,
   JSON.stringify(history.rows),
 )
@@ -267,8 +295,8 @@ await db.exec('set role authenticated')
 // RLS не бросает ошибку на UPDATE — просто не находит строк (0 обновлённых)
 const denied = await db.query("update public.reports set status = 'resolved' returning id")
 check('не-модератор НЕ может менять статус', denied.rows.length === 0, `обновлено строк: ${denied.rows.length}`)
-const stillReviewed = await db.query("select count(*)::int as n from public.reports_public where status = 'reviewed'")
-check('статус отчёта не изменился', stillReviewed.rows[0].n === 1)
+const stillTriaged = await db.query("select count(*)::int as n from public.reports_public where status = 'triaged'")
+check('статус отчёта не изменился', stillTriaged.rows[0].n === 1)
 await db.exec('reset role')
 
 const failed = results.filter((r) => !r.ok)

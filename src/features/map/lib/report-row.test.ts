@@ -8,29 +8,32 @@ function row(overrides: Record<string, unknown> = {}) {
     lat_public: 42.3479,
     lng_public: 76.1669,
     zone_id: 'kg-issyk-ton-ak-olong',
-    risk_level: 'high',
-    confidence: 0.82,
-    water_in_basement: true,
-    well_depth_m: 1.2,
+    category_user: 'basement_water',
+    comment: 'Вода в подвале',
+    immediate_danger: true,
+    weather_snapshot: { temperature_c: 12.5, precipitation_mm: 1.2, humidity_pct: 78 },
     status: 'new',
-    mode: 'resident',
     is_demo: false,
     ...overrides,
   }
 }
 
 describe('parseMapReports', () => {
-  it('принимает валидный список и не считает пропуски', () => {
+  it('принимает валидный список v2 и не считает пропуски', () => {
     const result = parseMapReports([row(), row({ id: 'a2' })])
 
     expect(result.reports).toHaveLength(2)
     expect(result.skipped).toBe(0)
   })
 
-  it('отчёт без оценки допустим: на карте он будет серым', () => {
-    const { reports } = parseMapReports([row({ risk_level: null, confidence: null, well_depth_m: null })])
+  it('отчёт без категории и снимка погоды допустим: на карте он будет серым/дефолтным', () => {
+    const { reports } = parseMapReports([
+      row({ category_user: null, comment: null, weather_snapshot: null }),
+    ])
 
-    expect(reports[0]!.risk_level).toBeNull()
+    expect(reports[0]!.category_user).toBeNull()
+    expect(reports[0]!.comment).toBeNull()
+    expect(reports[0]!.weather_snapshot).toBeNull()
   })
 
   it('битую строку отбрасывает, остальные сохраняет', () => {
@@ -40,11 +43,11 @@ describe('parseMapReports', () => {
     expect(result.skipped).toBe(1)
   })
 
-  it('неизвестный статус отбрасывает строку, а не ломает карту', () => {
-    const result = parseMapReports([row({ status: 'deleted' })])
+  it('неизвестный или устаревший статус (reviewed) отбрасывает строку', () => {
+    const result = parseMapReports([row({ status: 'reviewed' }), row({ status: 'deleted' })])
 
     expect(result.reports).toHaveLength(0)
-    expect(result.skipped).toBe(1)
+    expect(result.skipped).toBe(2)
   })
 
   it('падает, если пришёл не список: это ошибка запроса, а не «пустая карта»', () => {

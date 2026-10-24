@@ -1,30 +1,37 @@
 /**
- * Фильтры карты (риск / период / статус) живут в URL: ссылку на нужный вид карты
+ * Фильтры карты (категория / период / статус) живут в URL: ссылку на нужный вид карты
  * можно переслать, а «назад» возвращает прежний фильтр. Логика — чистые функции с тестами.
  */
-import type { ResidentRiskLevel } from '../../../config/risk'
+import { REPORT_CATEGORIES, type ReportCategory } from '../../../shared/lib/categories'
 import type { ReportStatus } from '../../../shared/types/database'
 
-export const RISK_FILTERS = ['all', 'low', 'medium', 'high'] as const
-export type RiskFilter = (typeof RISK_FILTERS)[number]
+export const CATEGORY_FILTERS = ['all', ...REPORT_CATEGORIES] as const
+export type CategoryFilter = (typeof CATEGORY_FILTERS)[number]
 
 export const PERIOD_FILTERS = ['7d', '30d', 'all'] as const
 export type PeriodFilter = (typeof PERIOD_FILTERS)[number]
 
-export const STATUS_FILTERS = ['all', 'new', 'reviewed', 'in_progress', 'resolved'] as const
+export const STATUS_FILTERS = [
+  'all',
+  'new',
+  'triaged',
+  'assigned',
+  'in_progress',
+  'resolved',
+] as const
 export type StatusFilter = (typeof STATUS_FILTERS)[number]
 
 export type MapFilters = {
-  risk: RiskFilter
+  category: CategoryFilter
   period: PeriodFilter
   status: StatusFilter
 }
 
 /** 30 дней — компромисс: свежие сигналы видны, старые не забивают карту. */
-export const DEFAULT_MAP_FILTERS: MapFilters = { risk: 'all', period: '30d', status: 'all' }
+export const DEFAULT_MAP_FILTERS: MapFilters = { category: 'all', period: '30d', status: 'all' }
 
-/** Ключи в URL короткие: `?risk=high&period=7d&status=new`. */
-export const FILTER_PARAMS = { risk: 'risk', period: 'period', status: 'status' } as const
+/** Ключи в URL короткие: `?category=basement_water&period=7d&status=new`. */
+export const FILTER_PARAMS = { category: 'category', period: 'period', status: 'status' } as const
 
 const PERIOD_DAYS: Record<PeriodFilter, number | null> = { '7d': 7, '30d': 30, all: null }
 
@@ -37,7 +44,7 @@ function pick<T extends string>(value: string | null, allowed: readonly T[], fal
 /** Мусор в URL не ломает карту: неизвестное значение → значение по умолчанию. */
 export function parseMapFilters(params: URLSearchParams): MapFilters {
   return {
-    risk: pick(params.get(FILTER_PARAMS.risk), RISK_FILTERS, DEFAULT_MAP_FILTERS.risk),
+    category: pick(params.get(FILTER_PARAMS.category), CATEGORY_FILTERS, DEFAULT_MAP_FILTERS.category),
     period: pick(params.get(FILTER_PARAMS.period), PERIOD_FILTERS, DEFAULT_MAP_FILTERS.period),
     status: pick(params.get(FILTER_PARAMS.status), STATUS_FILTERS, DEFAULT_MAP_FILTERS.status),
   }
@@ -54,7 +61,7 @@ export function serializeMapFilters(filters: MapFilters): URLSearchParams {
 
 export function hasActiveFilters(filters: MapFilters): boolean {
   return (
-    filters.risk !== DEFAULT_MAP_FILTERS.risk ||
+    filters.category !== DEFAULT_MAP_FILTERS.category ||
     filters.period !== DEFAULT_MAP_FILTERS.period ||
     filters.status !== DEFAULT_MAP_FILTERS.status
   )
@@ -72,15 +79,15 @@ export function isReportInPeriod(createdAt: string, period: PeriodFilter, now: D
 }
 
 type FilterableReport = {
-  risk_level: ResidentRiskLevel | null
+  category_user: ReportCategory | null
   created_at: string
   status: ReportStatus
 }
 
 export function matchesFilters(report: FilterableReport, filters: MapFilters, now: Date): boolean {
-  const riskOk = filters.risk === 'all' || report.risk_level === filters.risk
+  const categoryOk = filters.category === 'all' || report.category_user === filters.category
   const statusOk = filters.status === 'all' || report.status === filters.status
-  return riskOk && statusOk && isReportInPeriod(report.created_at, filters.period, now)
+  return categoryOk && statusOk && isReportInPeriod(report.created_at, filters.period, now)
 }
 
 export function filterReports<T extends FilterableReport>(

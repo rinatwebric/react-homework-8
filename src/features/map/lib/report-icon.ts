@@ -3,12 +3,15 @@
  * здесь только Leaflet: divIcon с inline-SVG пина из shared/lib/leaflet-icons.
  */
 import L from 'leaflet'
-import type { ResidentRiskLevel } from '../../../config/risk'
+import type { ReportCategory } from '../../../shared/lib/categories'
 import { createPinIcon } from '../../../shared/lib/leaflet-icons'
 import { clusterSize, reportFillColor } from './marker-visuals'
 
-export function createReportIcon(level: ResidentRiskLevel | null): L.DivIcon {
-  return createPinIcon({ fill: reportFillColor(level) })
+export function createReportIcon(category: ReportCategory | null, danger = false): L.DivIcon {
+  return createPinIcon({
+    fill: reportFillColor(category),
+    stroke: danger ? '#dc2626' : '#123a5c',
+  })
 }
 
 /** Кластер: «чернильный» круг с числом. Цвет не входит в шкалу риска. */

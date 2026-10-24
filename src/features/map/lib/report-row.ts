@@ -3,8 +3,8 @@
  * Читаем только нужные карте поля — точных координат и `device_hash` в представлении нет.
  */
 import { z } from 'zod'
-import { RESIDENT_RISK_LEVELS } from '../../../config/risk'
-import { REPORT_MODES, REPORT_STATUSES } from '../../../shared/types/database'
+import { REPORT_CATEGORIES } from '../../../shared/lib/categories'
+import { REPORT_STATUSES } from '../../../shared/types/database'
 
 /** Тот же список полей, что в REPORT_SELECT: одно место правки. */
 export const REPORT_SELECT = [
@@ -13,14 +13,26 @@ export const REPORT_SELECT = [
   'lat_public',
   'lng_public',
   'zone_id',
-  'risk_level',
-  'confidence',
-  'water_in_basement',
-  'well_depth_m',
+  'category_user',
+  'comment',
+  'immediate_danger',
+  'weather_snapshot',
   'status',
-  'mode',
   'is_demo',
 ].join(',')
+
+export const mapWeatherSchema = z
+  .object({
+    temperature_c: z.number().optional(),
+    precipitation_mm: z.number().optional(),
+    humidity_pct: z.number().optional(),
+    temp_c: z.number().optional(),
+    precip_mm: z.number().optional(),
+    humidity: z.number().optional(),
+  })
+  .passthrough()
+
+export type MapWeatherSnapshot = z.infer<typeof mapWeatherSchema>
 
 export const mapReportSchema = z.object({
   id: z.string().min(1),
@@ -28,12 +40,11 @@ export const mapReportSchema = z.object({
   lat_public: z.number().min(-90).max(90),
   lng_public: z.number().min(-180).max(180),
   zone_id: z.string().nullable(),
-  risk_level: z.enum(RESIDENT_RISK_LEVELS).nullable(),
-  confidence: z.number().min(0).max(1).nullable(),
-  water_in_basement: z.boolean(),
-  well_depth_m: z.number().nullable(),
+  category_user: z.enum(REPORT_CATEGORIES).nullable(),
+  comment: z.string().nullable(),
+  immediate_danger: z.boolean(),
+  weather_snapshot: mapWeatherSchema.nullable(),
   status: z.enum(REPORT_STATUSES),
-  mode: z.enum(REPORT_MODES),
   is_demo: z.boolean(),
 })
 
