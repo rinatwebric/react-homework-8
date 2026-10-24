@@ -54,8 +54,9 @@ describe('submissionBlock: чего не хватает для отправки'
     expect(submissionBlock({ ...draft, point: null })).toBe('location')
   })
 
-  it('нет GPS-фикса — блокирует: сдвиг нечем проверить', () => {
-    expect(submissionBlock({ ...draft, gps: null })).toBe('location')
+  it('нет GPS-фикса — блокирует с отдельной причиной', () => {
+    // Метка вручную не заменяет геопозицию (§7): причина `gps`, а не `location`.
+    expect(submissionBlock({ ...draft, gps: null })).toBe('gps')
   })
 
   it('категория не выбрана — блокирует', () => {
@@ -146,5 +147,6 @@ describe('buildSubmitPayload: тело запроса v2.0', () => {
       ok: false,
       reason: 'location',
     })
+    expect(buildSubmitPayload({ ...draft, gps: null })).toEqual({ ok: false, reason: 'gps' })
   })
 })

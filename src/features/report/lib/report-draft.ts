@@ -42,7 +42,7 @@ export type ReportDraft = {
   photoPath: string | null
 }
 
-export type ReportBlock = 'location' | 'category' | 'comment' | 'pin_far' | 'invalid'
+export type ReportBlock = 'location' | 'gps' | 'category' | 'comment' | 'pin_far' | 'invalid'
 
 /**
  * Длина комментария в символах, а не в UTF-16: `char_length` в Postgres и лимит
@@ -60,7 +60,10 @@ export function locationOffsetM(draft: Pick<ReportDraft, 'point' | 'gps'>): numb
 
 /** Хватает ли данных для кнопки «Отправить» — до нажатия, чтобы кнопка была честной. */
 export function submissionBlock(draft: ReportDraft): ReportBlock | null {
-  if (!draft.point || !draft.gps) return 'location'
+  if (!draft.point) return 'location'
+  // Без GPS-фикса заявку не примут (§7): метка вручную не заменяет геопозицию,
+  // поэтому причина отдельная — иначе подсказка врёт про «поставьте точку».
+  if (!draft.gps) return 'gps'
   if (!draft.category) return 'category'
   if (commentLength(draft.comment.trim()) > COMMENT_MAX_LENGTH) return 'comment'
 
@@ -76,7 +79,12 @@ export type BuildResult =
 export function buildSubmitPayload(draft: ReportDraft): BuildResult {
   const block = submissionBlock(draft)
   if (block) return { ok: false, reason: block }
-  if (!draft.point || !draft.gps || !draft.category) return { ok: false, reason: 'location' }
+
+  const { point, gps, category } = draft
+  if (!point || !gps || !category) {
+    // Недостижимо: без точки, фикса или категории submissionBlock уже вернул блок.
+    return { ok: false, reason: submissionBlock(draft) ?? 'invalid' }
+  }
 
   const comment = draft.comment.trim()
 
@@ -84,12 +92,12 @@ export function buildSubmitPayload(draft: ReportDraft): BuildResult {
     contract_version: REPORT_CONTRACT_VERSION,
     client_id: draft.clientId,
     device_hash: draft.deviceHash,
-    category: draft.category,
+    category,
     // Пустая строка и null — одно и то же («комментария нет»).
     comment: comment === '' ? null : comment,
     immediate_danger: draft.immediateDanger,
-    point: draft.point,
-    gps: { lat: draft.gps.lat, lng: draft.gps.lng, accuracy_m: draft.gps.accuracyM },
+    point,
+    gps: { lat: gps.lat, lng: gps.lng, accuracy_m: gps.accuracyM },
     photo_path: draft.photoPath,
     // Снимок погоды приходит в PR-3 (Open-Meteo) — пока null, поле контракта есть.
     weather_snapshot: null,

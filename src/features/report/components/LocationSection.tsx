@@ -129,6 +129,9 @@ export function LocationSection({
               {t('report.location.retry')}
             </Button>
           </div>
+          <p className="text-xs leading-snug text-muted-foreground">
+            {t('report.location.manualNote')}
+          </p>
         </Card>
       ) : null}
     </section>
