@@ -1,4 +1,4 @@
-import { Camera, Send } from 'lucide-react'
+import { Send } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useLocation } from 'react-router-dom'
@@ -15,6 +15,7 @@ import { CategoryPicker } from './components/CategoryPicker'
 import { CommentField } from './components/CommentField'
 import { DangerToggle } from './components/DangerToggle'
 import { LocationSection } from './components/LocationSection'
+import { PhotoField } from './components/PhotoField'
 import { ReportSent } from './components/ReportSent'
 import { useGeolocation } from './hooks/useGeolocation'
 import { hashDeviceId, readDeviceId } from './lib/device-id'
@@ -30,7 +31,7 @@ import { SubmitReportError, submitReport, type SubmitReportErrorCode } from './l
  * Срез 2, PR-2: заявка жителя v2.0 (§7).
  *
  * Обязательно: категория и координаты (GPS или пин в радиусе 300 м от GPS).
- * Необязательно: комментарий до 500 символов, фото с карты (или из галереи),
+ * Необязательно: комментарий до 500 символов, фото (с камеры или из галереи),
  * отметка «опасно для жизни». AI-оценка фото в заявку не входит — она нужна
  * только модератору (§8), поэтому и на форму не выводится.
  *
@@ -40,11 +41,11 @@ import { SubmitReportError, submitReport, type SubmitReportErrorCode } from './l
 export function ReportPage() {
   const { t } = useTranslation()
   const routeLocation = useLocation()
-  const photo = useMemo(() => readReportContext(routeLocation.state), [routeLocation.state])
+  const routePhoto = useMemo(() => readReportContext(routeLocation.state), [routeLocation.state])
 
   const { state: geo, refining, locate, setManualPoint, availability } = useGeolocation()
-  // client_id приходит с карты: фото уже лежит в его папке в бакете.
-  const [clientId] = useState(() => photo?.clientId ?? createClientId())
+  const [clientId] = useState(() => routePhoto?.clientId ?? createClientId())
+  const [photoPath, setPhotoPath] = useState<string | null>(() => routePhoto?.photoPath ?? null)
   const [deviceHash, setDeviceHash] = useState<string | null>(null)
   const [category, setCategory] = useState<ReportCategory | null>(null)
   const [comment, setComment] = useState('')
@@ -79,9 +80,9 @@ export function ReportPage() {
       immediateDanger,
       point: geo.point,
       gps: geo.gps ? { lat: geo.gps.lat, lng: geo.gps.lng, accuracyM: geo.gps.accuracyM } : null,
-      photoPath: photo?.photoPath ?? null,
+      photoPath,
     }),
-    [clientId, deviceHash, category, comment, immediateDanger, geo.point, geo.gps, photo],
+    [clientId, deviceHash, category, comment, immediateDanger, geo.point, geo.gps, photoPath],
   )
 
   const block = submissionBlock(draft)
@@ -122,21 +123,9 @@ export function ReportPage() {
       <ScreenHeader title={t('report.title')} />
       <p className="-mt-2 text-sm leading-snug text-muted-foreground">{t('report.lead')}</p>
 
-      {photo?.photoPath ? (
-        <Card className="flex items-start gap-3">
-          <Camera aria-hidden className="mt-0.5 size-5 shrink-0 text-ink" strokeWidth={2.25} />
-          <div className="space-y-1">
-            <p className="text-sm font-semibold text-ink">{t('report.photo.attached')}</p>
-            <p className="text-sm leading-snug text-muted-foreground">{t('report.photo.note')}</p>
-          </div>
-        </Card>
-      ) : (
-        <Banner tone="info" title={t('report.photo.noneTitle')}>
-          {t('report.photo.noneText')}
-        </Banner>
-      )}
-
       <CategoryPicker value={category} onChange={setCategory} />
+
+      <PhotoField clientId={clientId} photoPath={photoPath} onChange={setPhotoPath} />
 
       <LocationSection
         state={geo}
