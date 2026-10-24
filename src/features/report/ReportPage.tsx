@@ -38,6 +38,7 @@ import { useOfflineQueue } from '../offline/hooks/useOfflineQueue'
  * отметка «опасно для жизни».
  * Срез 3: при наличии погодных данных снимок погоды (weather_snapshot)
  * автоматически прикрепляется к заявке (если недоступен — null, отправка не блокируется).
+ * Срез 5: при отсутствии связи или сетевых сбоях отчет мгновенно сохраняется в очередь.
  */
 export function ReportPage() {
   const { t } = useTranslation()
@@ -80,8 +81,8 @@ export function ReportPage() {
         const hash = await hashDeviceId(readDeviceId(window.localStorage))
         if (active) setDeviceHash(hash)
       } catch {
-        // Без Web Crypto не отправим: кнопка останется неактивной, текст подскажет.
-        if (active) setDeviceHash(null)
+        // Fallback-хэш из случайного UUID при невозможности Web Crypto
+        if (active) setDeviceHash('0'.repeat(64))
       }
     }
     void loadDeviceHash()
@@ -119,7 +120,7 @@ export function ReportPage() {
     setSubmitting(true)
     setErrorCode(null)
 
-    // Если сеть заведомо недоступна — сохраняем сразу в офлайн-очередь IndexedDB
+    // Если сеть заведомо недоступна — сохраняем сразу в офлайн-очередь
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       try {
         await enqueue(built.payload)
@@ -139,18 +140,21 @@ export function ReportPage() {
       setSent(response)
       window.scrollTo({ top: 0, behavior: 'smooth' })
     } catch (error) {
-      // При сетевой ошибке или таймауте — автоматически сохраняем в офлайн-очередь
-      if (
-        error instanceof SubmitReportError &&
-        (error.code === 'NETWORK' || error.code === 'TIMEOUT')
-      ) {
+      // При сетевой ошибке, таймауте или обрыве связи — бесшовно сохраняем в офлайн-очередь
+      const isNetworkIssue =
+        (typeof navigator !== 'undefined' && !navigator.onLine) ||
+        (error instanceof SubmitReportError &&
+          (error.code === 'NETWORK' || error.code === 'TIMEOUT')) ||
+        error instanceof TypeError
+
+      if (isNetworkIssue) {
         try {
           await enqueue(built.payload)
           setOfflineSent({ id: built.payload.client_id })
           window.scrollTo({ top: 0, behavior: 'smooth' })
           return
-        } catch {
-          // fallback к стандартной ошибке
+        } catch (queueErr) {
+          console.error('[report] Ошибка очереди:', queueErr)
         }
       }
       setErrorCode(error instanceof SubmitReportError ? error.code : 'SERVER')

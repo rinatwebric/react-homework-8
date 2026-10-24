@@ -29,8 +29,16 @@ export function readDeviceId(storage: DeviceStorage): string {
 
 export async function hashDeviceId(deviceId: string): Promise<string> {
   const bytes = new TextEncoder().encode(deviceId)
-  const digest = await crypto.subtle.digest('SHA-256', bytes)
-  return Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, '0'))
+  if (typeof crypto !== 'undefined' && crypto.subtle && typeof crypto.subtle.digest === 'function') {
+    const digest = await crypto.subtle.digest('SHA-256', bytes)
+    return Array.from(new Uint8Array(digest))
+      .map((byte) => byte.toString(16).padStart(2, '0'))
+      .join('')
+  }
+
+  // Fallback для небезопасных контекстов (например, HTTP dev-сервер по IP на мобильном)
+  const hex = Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, '0'))
     .join('')
+  return hex.repeat(2).slice(0, 64).padEnd(64, '0')
 }

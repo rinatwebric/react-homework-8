@@ -1,18 +1,19 @@
 import { ArrowRight, Bell, CloudRain, MapPin, Plus } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import { DEMO_HOME } from '../../config/demo'
 import { features } from '../../config/features'
 import { PILOT_ZONE } from '../../config/pilot'
-import { Banner } from '../../shared/ui/Banner'
 import { ButtonLink } from '../../shared/ui/Button'
 import { Card } from '../../shared/ui/Card'
-import { DemoTag } from '../../shared/ui/DemoTag'
 import { EmergencyCallButton } from '../../shared/ui/EmergencyCallButton'
 import { IconTile } from '../../shared/ui/IconTile'
 import { RiskScale } from '../../shared/ui/RiskScale'
+import type { RiskLevel } from '../../config/risk'
+import { fetchRecentAlerts } from '../alerts/alerts-api'
+import type { AlertItem } from '../alerts/types'
 import { ActiveAlertBanner } from './components/ActiveAlertBanner'
+import { RecentAlertsList } from './components/RecentAlertsList'
 import { RainWarningBanner } from '../weather/components/RainWarningBanner'
 import { useWeather } from '../weather/hooks/useWeather'
 
@@ -21,14 +22,51 @@ const TILES = [
   { to: '/report', icon: Plus, titleKey: 'home.tiles.reportTitle', textKey: 'home.tiles.reportText' },
 ] as const
 
-/** Главная: село, риск подтопления, компактная сводка погоды с переходом в «О воде», экстренная помощь 112. */
+/** Главная: село, оперативный риск подтопления по погоде, предупреждения, сводка погоды и 112. */
 export function HomePage() {
   const { t } = useTranslation()
   const [alertsOpen, setAlertsOpen] = useState(false)
+  const [alerts, setAlerts] = useState<AlertItem[]>([])
+
   const { weather } = useWeather({
     lat: PILOT_ZONE.center.lat,
     lng: PILOT_ZONE.center.lng,
   })
+
+  // Загружаем недавние предупреждения службы
+  useEffect(() => {
+    let isMounted = true
+    void fetchRecentAlerts(48).then((data) => {
+      if (isMounted) {
+        setAlerts(data)
+      }
+    })
+    return () => {
+      isMounted = false
+    }
+  }, [])
+
+  // Расчёт фактического уровня риска подтопления на основе погоды в пилотной зоне
+  const riskLevel: RiskLevel = useMemo(() => {
+    if (!weather) return 'normal'
+    if (weather.precip_mm >= 15) return 'critical'
+    if (weather.precip_mm >= 5) return 'high'
+    if (weather.precip_mm >= 1) return 'elevated'
+    return 'normal'
+  }, [weather])
+
+  const riskAdvice = useMemo(() => {
+    if (riskLevel === 'critical') {
+      return t('home.riskAdviceCritical', 'Критический объем осадков! Возможен резкий подъем воды в арыках и подвалах.')
+    }
+    if (riskLevel === 'high') {
+      return t('home.riskAdviceHigh', 'Высокий уровень осадков. Проверьте дренажи, арыки и места скопления воды.')
+    }
+    if (riskLevel === 'elevated') {
+      return t('home.riskAdviceElevated', 'Ожидаются осадки. Проверьте подвал и очистите канаву у дома.')
+    }
+    return t('home.riskAdviceNormal', 'Осадков не ожидается. Уровень грунтовых вод в пределах сезонной нормы.')
+  }, [riskLevel, t])
 
   return (
     <div className="space-y-4">
@@ -44,13 +82,20 @@ export function HomePage() {
           aria-label={t('home.bellLabel')}
           aria-expanded={alertsOpen}
           onClick={() => setAlertsOpen((open) => !open)}
-          className="grid size-14 shrink-0 place-items-center rounded-2xl bg-card text-ink shadow-card"
+          className="relative grid size-14 shrink-0 place-items-center rounded-2xl bg-card text-ink shadow-card transition-colors hover:bg-muted/40"
         >
           <Bell aria-hidden className="size-6" strokeWidth={2} />
+          {alerts.length > 0 && (
+            <span
+              title={`Оповещений: ${alerts.length}`}
+              className="absolute top-3 right-3 flex size-3 items-center justify-center rounded-full bg-rose-600 ring-2 ring-card"
+            />
+          )}
         </button>
       </header>
 
-      {alertsOpen ? <Banner tone="info">{t('home.bellNote')}</Banner> : null}
+      {/* Выпадающий блок со списком активных оповещений службы при клике на колокольчик */}
+      {alertsOpen && <RecentAlertsList alerts={alerts} />}
 
       {/* Оперативное предупреждение службы (Срез 5, ТЗ v2.0 §13) */}
       <ActiveAlertBanner />
@@ -88,21 +133,17 @@ export function HomePage() {
 
       <EmergencyCallButton />
 
+      {/* Карточка риска подтопления на основе погоды (без демо-плашек) */}
       <Card tone="ink" className="space-y-4 p-6">
         <p className="text-sm font-medium text-on-ink/70">{t('home.riskLabel')}</p>
-        <p className="text-4xl font-extrabold tracking-tight">{t(`risk.${DEMO_HOME.level}`)}</p>
-        <RiskScale level={DEMO_HOME.level} />
-        <p className="text-[15px] leading-snug text-on-ink/85">{t('home.riskAdvice')}</p>
+        <p className="text-4xl font-extrabold tracking-tight">{t(`risk.${riskLevel}`)}</p>
+        <RiskScale level={riskLevel} />
+        <p className="text-[15px] leading-snug text-on-ink/85">{riskAdvice}</p>
         <ButtonLink to="/report" className="w-full">
           {t('home.ctaReport')}
           <ArrowRight aria-hidden className="size-5" strokeWidth={2.5} />
         </ButtonLink>
       </Card>
-
-      <div className="flex items-start gap-2">
-        <DemoTag />
-        <p className="text-xs leading-snug text-muted-foreground">{t('home.demoNote')}</p>
-      </div>
 
       <div className="grid grid-cols-2 gap-3">
         {TILES.map(({ to, icon: Icon, titleKey, textKey }) => (

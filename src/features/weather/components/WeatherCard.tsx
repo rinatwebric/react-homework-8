@@ -18,7 +18,7 @@ interface WeatherCardProps {
  * - Иконка и текстовое описание состояния погоды
  * - Влажность и текущие осадки
  * - Прогноз на 3 дня вперёд (макс/мин, иконка, вероятность осадков)
- * - Время последнего обновления и источник Open-Meteo (справочно)
+ * - Время последнего обновления
  */
 export function WeatherCard({ weather, loading, onRefresh }: WeatherCardProps) {
   const { t, i18n } = useTranslation()
@@ -143,10 +143,6 @@ export function WeatherCard({ weather, loading, onRefresh }: WeatherCardProps) {
           </div>
         </div>
       ) : null}
-
-      <p className="text-[11px] leading-tight text-muted-foreground/80">
-        {t('weather.disclaimer')}
-      </p>
     </Card>
   )
 }
