@@ -55,6 +55,39 @@ export function commentLength(comment: string): number {
   return Array.from(comment).length
 }
 
+export type ResidentRiskSeverity = 'moderate' | 'elevated' | 'critical'
+
+export function getRiskPrefix(riskSeverity: ResidentRiskSeverity): string {
+  switch (riskSeverity) {
+    case 'critical':
+      return '[Критический риск / ЧС]'
+    case 'elevated':
+      return '[Высокий риск]'
+    case 'moderate':
+    default:
+      return '[Умеренный риск]'
+  }
+}
+
+/**
+ * Безопасное формирование комментария с префиксом риска,
+ * гарантирующее непревышение лимита 500 символов (COMMENT_MAX_LENGTH).
+ */
+export function formatCommentWithRisk(
+  rawComment: string,
+  riskSeverity: ResidentRiskSeverity = 'moderate',
+): string {
+  const prefix = getRiskPrefix(riskSeverity)
+  const trimmed = rawComment.trim()
+  if (!trimmed) return prefix
+
+  const maxRawLen = Math.max(0, COMMENT_MAX_LENGTH - commentLength(prefix) - 1)
+  const chars = Array.from(trimmed)
+  const safeText = chars.length > maxRawLen ? chars.slice(0, maxRawLen).join('') : trimmed
+
+  return safeText ? `${prefix} ${safeText}` : prefix
+}
+
 /** Насколько метка сдвинута от GPS; null — нет точки или фикса. */
 export function locationOffsetM(draft: Pick<ReportDraft, 'point' | 'gps'>): number | null {
   if (!draft.point || !draft.gps) return null

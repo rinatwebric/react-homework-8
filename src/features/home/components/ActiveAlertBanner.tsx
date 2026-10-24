@@ -1,12 +1,18 @@
-import { AlertOctagon, AlertTriangle, PhoneCall } from 'lucide-react'
+import { AlertOctagon, AlertTriangle, PhoneCall, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { fetchRecentAlerts } from '../../alerts/alerts-api'
+import {
+  dismissAlert,
+  filterUndismissedAlerts,
+  getDismissedAlertIds,
+} from '../../alerts/lib/dismissed-alerts'
 import type { AlertItem } from '../../alerts/types'
 
 export function ActiveAlertBanner() {
   const { t } = useTranslation()
   const [alerts, setAlerts] = useState<AlertItem[]>([])
+  const [dismissedIds, setDismissedIds] = useState<string[]>(() => getDismissedAlertIds())
 
   useEffect(() => {
     let isMounted = true
@@ -20,11 +26,17 @@ export function ActiveAlertBanner() {
     }
   }, [])
 
-  // Ищем наиболее приоритетное предупреждение
-  const primaryAlert = alerts.find((a) => a.level === 'critical' || a.level === 'warning')
+  // Исключаем скрытые пользователем предупреждения и ищем наиболее приоритетное
+  const visibleAlerts = filterUndismissedAlerts(alerts, dismissedIds)
+  const primaryAlert = visibleAlerts.find((a) => a.level === 'critical' || a.level === 'warning')
 
   if (!primaryAlert) {
     return null
+  }
+
+  const handleDismiss = () => {
+    dismissAlert(primaryAlert.id)
+    setDismissedIds((prev) => [...prev, primaryAlert.id])
   }
 
   const isCritical = primaryAlert.level === 'critical'
@@ -38,10 +50,25 @@ export function ActiveAlertBanner() {
       role="alert"
       className={
         isCritical
-          ? 'relative rounded-2xl border-2 border-rose-500 bg-rose-50 p-4 text-rose-950 shadow-md dark:border-rose-600 dark:bg-rose-950/60 dark:text-rose-100'
-          : 'relative rounded-2xl border-2 border-amber-400 bg-amber-50 p-4 text-amber-950 shadow-md dark:border-amber-600 dark:bg-amber-950/60 dark:text-amber-100'
+          ? 'relative rounded-2xl border-2 border-rose-500 bg-rose-50 p-4 text-rose-950 shadow-md animate-in fade-in dark:border-rose-600 dark:bg-rose-950/60 dark:text-rose-100'
+          : 'relative rounded-2xl border-2 border-amber-400 bg-amber-50 p-4 text-amber-950 shadow-md animate-in fade-in dark:border-amber-600 dark:bg-amber-950/60 dark:text-amber-100'
       }
     >
+      {/* Кнопка закрытия/скрытия предупреждения */}
+      <button
+        type="button"
+        onClick={handleDismiss}
+        aria-label={t('alerts.banner.dismiss', 'Скрыть предупреждение')}
+        title={t('alerts.banner.dismiss', 'Скрыть предупреждение')}
+        className={
+          isCritical
+            ? 'absolute top-3 right-3 grid size-8 place-items-center rounded-xl text-rose-700 hover:bg-rose-200/60 active:scale-95 transition-all dark:text-rose-300 dark:hover:bg-rose-900/60'
+            : 'absolute top-3 right-3 grid size-8 place-items-center rounded-xl text-amber-800 hover:bg-amber-200/60 active:scale-95 transition-all dark:text-amber-300 dark:hover:bg-amber-900/60'
+        }
+      >
+        <X className="size-4" strokeWidth={2.5} />
+      </button>
+
       <div className="flex items-start gap-3">
         <div
           className={
@@ -57,7 +84,7 @@ export function ActiveAlertBanner() {
           )}
         </div>
 
-        <div className="min-w-0 flex-1 space-y-1.5">
+        <div className="min-w-0 flex-1 space-y-1.5 pr-6">
           <div className="flex flex-wrap items-center justify-between gap-1">
             <span
               className={

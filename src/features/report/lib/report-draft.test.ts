@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   buildSubmitPayload,
   commentLength,
+  formatCommentWithRisk,
+  getRiskPrefix,
   locationOffsetM,
   submissionBlock,
   type ReportDraft,
@@ -25,6 +27,41 @@ describe('commentLength: символы, а не UTF-16', () => {
     expect(commentLength('вода')).toBe(4)
     expect(commentLength('💧')).toBe(1)
     expect(commentLength('💧💧')).toBe(2)
+  })
+})
+
+describe('formatCommentWithRisk: форматирование с префиксом риска', () => {
+  it('возвращает корректные префиксы для каждого уровня риска', () => {
+    expect(getRiskPrefix('critical')).toBe('[Критический риск / ЧС]')
+    expect(getRiskPrefix('elevated')).toBe('[Высокий риск]')
+    expect(getRiskPrefix('moderate')).toBe('[Умеренный риск]')
+  })
+
+  it('для пустого комментария возвращает только префикс', () => {
+    expect(formatCommentWithRisk('', 'moderate')).toBe('[Умеренный риск]')
+    expect(formatCommentWithRisk('   ', 'elevated')).toBe('[Высокий риск]')
+    expect(formatCommentWithRisk('', 'critical')).toBe('[Критический риск / ЧС]')
+  })
+
+  it('добавляет префикс к обычному комментарию', () => {
+    const res = formatCommentWithRisk('Вода в подвале', 'critical')
+    expect(res).toBe('[Критический риск / ЧС] Вода в подвале')
+  })
+
+  it('обрезает текст так, чтобы суммарная длина никогда не превышала 500 символов', () => {
+    const longText = 'а'.repeat(550)
+    const formatted = formatCommentWithRisk(longText, 'critical')
+
+    expect(commentLength(formatted)).toBeLessThanOrEqual(500)
+    expect(submissionBlock({ ...draft, comment: formatted })).toBeNull()
+  })
+
+  it('корректно работает с эмодзи в длинном тексте', () => {
+    const emojiText = '💧'.repeat(490)
+    const formatted = formatCommentWithRisk(emojiText, 'elevated')
+
+    expect(commentLength(formatted)).toBeLessThanOrEqual(500)
+    expect(submissionBlock({ ...draft, comment: formatted })).toBeNull()
   })
 })
 

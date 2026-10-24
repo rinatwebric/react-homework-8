@@ -4,9 +4,57 @@ import {
   calculateAdminKpi,
   filterReports,
   isDuplicateDistance,
+  parseResidentRisk,
 } from './admin-utils'
 
 describe('admin-utils', () => {
+  describe('parseResidentRisk', () => {
+    it('определяет critical при immediate_danger', () => {
+      expect(parseResidentRisk({ immediate_danger: true, comment: null })).toBe('critical')
+    })
+
+    it('определяет critical при наличии метки критического риска в комментарии', () => {
+      expect(
+        parseResidentRisk({
+          immediate_danger: false,
+          comment: '[Критический риск / ЧС] Срочно!',
+        }),
+      ).toBe('critical')
+    })
+
+    it('определяет elevated при высоком риске в комментарии', () => {
+      expect(
+        parseResidentRisk({
+          immediate_danger: false,
+          comment: '[Высокий риск] Вода поднимается',
+        }),
+      ).toBe('elevated')
+    })
+
+    it('определяет moderate при умеренном риске в комментарии', () => {
+      expect(
+        parseResidentRisk({
+          immediate_danger: false,
+          comment: '[Умеренный риск] Сырость в подвале',
+        }),
+      ).toBe('moderate')
+    })
+
+    it('возвращает null, если риск не указан и нет опасности', () => {
+      expect(
+        parseResidentRisk({
+          immediate_danger: false,
+          comment: 'Просто текст',
+        }),
+      ).toBeNull()
+      expect(
+        parseResidentRisk({
+          immediate_danger: false,
+          comment: null,
+        }),
+      ).toBeNull()
+    })
+  })
   describe('isDuplicateDistance', () => {
     const center = { lat: 42.34793, lng: 76.1669 }
 
@@ -262,6 +310,103 @@ describe('admin-utils', () => {
       const res = filterReports(sample, { duplicateGroup: 'grp-1' })
       expect(res.length).toBe(1)
       expect(res[0]?.id).toBe('rep-01')
+    })
+
+    it('фильтрует по категории', () => {
+      const res = filterReports(sample, { category: 'drainage_issue' })
+      expect(res.length).toBe(1)
+      expect(res[0]?.id).toBe('rep-02')
+    })
+
+    it('фильтрует по флагу dangerOnly', () => {
+      const withDanger: ReportWithTriage[] = [
+        ...sample,
+        {
+          ...sample[0]!,
+          id: 'rep-danger',
+          immediate_danger: true,
+        },
+      ]
+      const res = filterReports(withDanger, { dangerOnly: true })
+      expect(res.length).toBe(1)
+      expect(res[0]?.id).toBe('rep-danger')
+    })
+
+    it('фильтрует по highRiskOnly (по comment, immediate_danger и ai urgency)', () => {
+      const reports: ReportWithTriage[] = [
+        {
+          ...sample[0]!,
+          id: 'r-moderate',
+          comment: '[Умеренный риск] Вода капает',
+          immediate_danger: false,
+          ai_triage: { ...sample[0]!.ai_triage!, urgency_ai: 'low' },
+        },
+        {
+          ...sample[0]!,
+          id: 'r-elevated-comment',
+          comment: '[Высокий риск] Вода поднимается',
+          immediate_danger: false,
+          ai_triage: { ...sample[0]!.ai_triage!, urgency_ai: 'low' },
+        },
+        {
+          ...sample[0]!,
+          id: 'r-critical-comment',
+          comment: '[Критический риск / ЧС] Затопило дом',
+          immediate_danger: false,
+          ai_triage: null,
+        },
+        {
+          ...sample[0]!,
+          id: 'r-danger-flag',
+          comment: 'Обычный текст',
+          immediate_danger: true,
+          ai_triage: null,
+        },
+        {
+          ...sample[0]!,
+          id: 'r-ai-high',
+          comment: null,
+          immediate_danger: false,
+          ai_triage: { ...sample[0]!.ai_triage!, urgency_ai: 'high' },
+        },
+        {
+          ...sample[0]!,
+          id: 'r-ai-critical',
+          comment: null,
+          immediate_danger: false,
+          ai_triage: { ...sample[0]!.ai_triage!, urgency_ai: 'critical' },
+        },
+      ]
+
+      const res = filterReports(reports, { highRiskOnly: true })
+      const matchedIds = res.map((r) => r.id)
+
+      expect(matchedIds).toContain('r-elevated-comment')
+      expect(matchedIds).toContain('r-critical-comment')
+      expect(matchedIds).toContain('r-danger-flag')
+      expect(matchedIds).toContain('r-ai-high')
+      expect(matchedIds).toContain('r-ai-critical')
+      expect(matchedIds).not.toContain('r-moderate')
+      expect(res.length).toBe(5)
+    })
+
+    it('поиск находит заявку по id и по moderator_note', () => {
+      const reportsWithNotes: ReportWithTriage[] = [
+        {
+          ...sample[0]!,
+          id: 'report-abc-123',
+          moderator_note: null,
+        },
+        {
+          ...sample[1]!,
+          id: 'report-xyz-789',
+          moderator_note: 'Проверено инспектором МЧС',
+        },
+      ]
+
+      expect(filterReports(reportsWithNotes, { search: 'abc-123' })[0]?.id).toBe('report-abc-123')
+      expect(filterReports(reportsWithNotes, { search: 'инспектором' })[0]?.id).toBe('report-xyz-789')
+      expect(filterReports(reportsWithNotes, { search: 'несуществующий' }).length).toBe(0)
     })
   })
 })

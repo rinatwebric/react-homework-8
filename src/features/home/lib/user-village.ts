@@ -13,6 +13,20 @@ export interface UserLocationName {
   fullTitle: string
 }
 
+export function isUserLocationName(obj: unknown): obj is UserLocationName {
+  if (!obj || typeof obj !== 'object') return false
+  const o = obj as Record<string, unknown>
+  const validTypes = ['city', 'town', 'village', 'district']
+  return (
+    typeof o.placeName === 'string' &&
+    o.placeName.trim().length > 0 &&
+    typeof o.placeType === 'string' &&
+    validTypes.includes(o.placeType) &&
+    typeof o.typeLabelRu === 'string' &&
+    typeof o.fullTitle === 'string'
+  )
+}
+
 /**
  * Получить сохраненное ранее имя локации из кэша
  */
@@ -20,7 +34,9 @@ export function getCachedLocationName(): UserLocationName | null {
   if (typeof window === 'undefined') return null
   try {
     const raw = localStorage.getItem(LOCATION_NAME_KEY)
-    if (raw) return JSON.parse(raw) as UserLocationName
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (isUserLocationName(parsed)) return parsed
   } catch {
     // ignore
   }

@@ -12,6 +12,7 @@ import {
 } from '../../../shared/lib/categories'
 import { cx } from '../../../shared/lib/cx'
 import type { ReportStatus, ReportWithTriage } from '../../../shared/types/database'
+import { parseResidentRisk } from '../admin-utils'
 
 interface AdminReportListProps {
   reports: ReportWithTriage[]
@@ -80,9 +81,9 @@ export function AdminReportList({
         const tempVal = weather?.temperature_c ?? weather?.temp_c
         const precipVal = weather?.precipitation_mm ?? weather?.precip_mm
 
-        const isCriticalRisk =
-          report.immediate_danger || (report.comment ?? '').includes('[Критический')
-        const isHighRisk = (report.comment ?? '').includes('[Высокий')
+        const residentRisk = parseResidentRisk(report)
+        const isCriticalRisk = residentRisk === 'critical'
+        const isHighRisk = residentRisk === 'elevated'
 
         return (
           <div

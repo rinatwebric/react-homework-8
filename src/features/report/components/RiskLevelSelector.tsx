@@ -1,4 +1,5 @@
 import { AlertOctagon, AlertTriangle, ShieldCheck } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { cx } from '../../../shared/lib/cx'
 
 export type ResidentRiskSeverity = 'moderate' | 'elevated' | 'critical'
@@ -18,6 +19,8 @@ export function RiskLevelSelector({
   severity,
   onSelect,
 }: RiskLevelSelectorProps) {
+  const { t } = useTranslation()
+
   const levels: Array<{
     id: ResidentRiskSeverity
     label: string
@@ -29,8 +32,8 @@ export function RiskLevelSelector({
   }> = [
     {
       id: 'moderate',
-      label: 'Умеренный риск',
-      sublabel: 'Сырость, небольшая вода, угрозы жизни нет',
+      label: t('report.riskLevel.moderate.label', 'Умеренный риск'),
+      sublabel: t('report.riskLevel.moderate.sublabel', 'Сырость, небольшая вода, угрозы жизни нет'),
       icon: ShieldCheck,
       activeClasses: 'border-blue-500 bg-blue-50/70 text-blue-950 shadow-xs ring-1 ring-blue-500/30',
       iconBg: 'bg-blue-100 text-blue-700',
@@ -38,8 +41,8 @@ export function RiskLevelSelector({
     },
     {
       id: 'elevated',
-      label: 'Высокий риск',
-      sublabel: 'Вода прибывает, есть угроза имуществу и постройкам',
+      label: t('report.riskLevel.elevated.label', 'Высокий риск'),
+      sublabel: t('report.riskLevel.elevated.sublabel', 'Вода прибывает, есть угроза имуществу и постройкам'),
       icon: AlertTriangle,
       activeClasses: 'border-amber-500 bg-amber-50/70 text-amber-950 shadow-xs ring-1 ring-amber-500/30',
       iconBg: 'bg-amber-100 text-amber-700',
@@ -47,8 +50,8 @@ export function RiskLevelSelector({
     },
     {
       id: 'critical',
-      label: 'Критический / ЧС',
-      sublabel: 'Угроза жизни, резкое затопление (звонок 112)',
+      label: t('report.riskLevel.critical.label', 'Критический / ЧС'),
+      sublabel: t('report.riskLevel.critical.sublabel', 'Угроза жизни, резкое затопление (звонок 112)'),
       icon: AlertOctagon,
       activeClasses: 'border-rose-600 bg-rose-50/70 text-rose-950 shadow-xs ring-1 ring-rose-600/30',
       iconBg: 'bg-rose-100 text-rose-700',
@@ -60,10 +63,10 @@ export function RiskLevelSelector({
     <div className="space-y-2.5">
       <div>
         <label className="text-sm font-bold text-ink">
-          Уровень риска подтопления
+          {t('report.riskLevel.title', 'Уровень риска подтопления')}
         </label>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          Оцените опасность ситуации для определения приоритета выезда службы
+          {t('report.riskLevel.hint', 'Оцените опасность ситуации для определения приоритета выезда службы')}
         </p>
       </div>
 
@@ -99,7 +102,7 @@ export function RiskLevelSelector({
                   </span>
                   {isSelected && (
                     <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-current text-white">
-                      Выбрано
+                      {t('report.riskLevel.selected', 'Выбрано')}
                     </span>
                   )}
                 </div>
@@ -116,17 +119,17 @@ export function RiskLevelSelector({
         <div className="mt-2 flex items-center justify-between gap-3 rounded-2xl bg-rose-600 p-3.5 text-white shadow-md animate-in fade-in">
           <div className="min-w-0">
             <p className="text-xs font-bold leading-tight">
-              Экстренная опасность для жизни?
+              {t('report.riskLevel.emergencyTitle', 'Экстренная опасность для жизни?')}
             </p>
             <p className="text-[11px] text-white/90 leading-tight mt-0.5">
-              Служба спасения Кыргызстана (круглосуточно)
+              {t('report.riskLevel.emergencyDesc', 'Служба спасения Кыргызстана (круглосуточно)')}
             </p>
           </div>
           <a
             href="tel:112"
             className="shrink-0 rounded-xl bg-white px-3.5 py-1.5 text-xs font-extrabold text-rose-700 shadow-sm active:scale-95 transition-transform"
           >
-            Позвонить 112
+            {t('report.riskLevel.call112', 'Позвонить 112')}
           </a>
         </div>
       )}

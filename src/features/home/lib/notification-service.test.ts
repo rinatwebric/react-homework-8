@@ -1,8 +1,10 @@
-import { describe, expect, it, beforeEach } from 'vitest'
+import { describe, expect, it, beforeEach, vi, afterEach } from 'vitest'
 import {
   countUnreadAlerts,
   markAlertsAsSeen,
   getAlertsLastSeen,
+  notifyNewAlerts,
+  showSystemNotification,
 } from './notification-service'
 import type { AlertItem } from '../../alerts/types'
 
@@ -20,11 +22,18 @@ describe('notification-service', () => {
       },
     }
 
-    // Assign mock window & localStorage
     // @ts-ignore
-    globalThis.window = {}
+    globalThis.window = {
+      localStorage: mockStorage,
+    }
     // @ts-ignore
     globalThis.localStorage = mockStorage
+    vi.restoreAllMocks()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
   })
 
   it('correctly calculates unread alerts and marks them as seen', () => {
@@ -45,17 +54,12 @@ describe('notification-service', () => {
       },
     ]
 
-    // Initially lastSeen is 0, so both are unread
     expect(countUnreadAlerts(mockAlerts)).toBe(2)
 
-    // Mark as seen
     markAlertsAsSeen()
     expect(getAlertsLastSeen()).toBeGreaterThan(0)
-
-    // Now unread count is 0
     expect(countUnreadAlerts(mockAlerts)).toBe(0)
 
-    // A brand new alert arrives later
     const futureAlert: AlertItem = {
       id: '3',
       level: 'info',
@@ -64,5 +68,98 @@ describe('notification-service', () => {
     }
 
     expect(countUnreadAlerts([...mockAlerts, futureAlert])).toBe(1)
+  })
+
+  describe('notifyNewAlerts', () => {
+    it('не отправляет уведомление, если права не предоставлены', async () => {
+      // @ts-ignore
+      globalThis.Notification = { permission: 'default' }
+
+      const alerts: AlertItem[] = [
+        {
+          id: 'alert-1',
+          level: 'critical',
+          message: 'Эвакуация',
+          created_at: new Date().toISOString(),
+        },
+      ]
+
+      const result = await notifyNewAlerts(alerts)
+      expect(result).toBe(false)
+    })
+
+    it('отправляет уведомление о новом алерте и запоминает его id', async () => {
+      const showNotifMock = vi.fn().mockResolvedValue(undefined)
+
+      const notifMock = { permission: 'granted' }
+      // @ts-ignore
+      globalThis.Notification = notifMock
+      // @ts-ignore
+      globalThis.window.Notification = notifMock
+      vi.stubGlobal('navigator', {
+        serviceWorker: {
+          ready: Promise.resolve({
+            showNotification: showNotifMock,
+          }),
+        },
+      })
+
+      const alerts: AlertItem[] = [
+        {
+          id: 'alert-unique-123',
+          level: 'critical',
+          area: 'с. Ак-Өлөң',
+          message: 'Подтопление улицы',
+          created_at: new Date().toISOString(),
+        },
+      ]
+
+      const result = await notifyNewAlerts(alerts)
+      expect(result).toBe(true)
+      expect(showNotifMock).toHaveBeenCalledTimes(1)
+      const firstCall = showNotifMock.mock.calls[0]
+      expect(firstCall?.[0]).toContain('ЧС / Опасность!')
+      expect(firstCall?.[1]?.body).toContain('Подтопление улицы')
+
+      // Повторный вызов не дублирует уведомление
+      const secondResult = await notifyNewAlerts(alerts)
+      expect(secondResult).toBe(false)
+      expect(showNotifMock).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('showSystemNotification', () => {
+    it('возвращает false, если Notification недоступен', async () => {
+      // @ts-ignore
+      delete globalThis.Notification
+      // @ts-ignore
+      delete globalThis.window.Notification
+      const sent = await showSystemNotification('Тест')
+      expect(sent).toBe(false)
+    })
+
+    it('показывает уведомление через Service Worker', async () => {
+      const showNotif = vi.fn().mockResolvedValue(undefined)
+      const notifMock = { permission: 'granted' }
+      // @ts-ignore
+      globalThis.Notification = notifMock
+      // @ts-ignore
+      globalThis.window.Notification = notifMock
+      vi.stubGlobal('navigator', {
+        serviceWorker: {
+          ready: Promise.resolve({ showNotification: showNotif }),
+        },
+      })
+
+      const sent = await showSystemNotification('Внимание', { body: 'Проверка' })
+      expect(sent).toBe(true)
+      expect(showNotif).toHaveBeenCalledWith(
+        'Внимание',
+        expect.objectContaining({
+          body: 'Проверка',
+          icon: '/pwa-192x192.png',
+        }),
+      )
+    })
   })
 })

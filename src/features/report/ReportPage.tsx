@@ -24,6 +24,7 @@ import { useGeolocation } from './hooks/useGeolocation'
 import { hashDeviceId, readDeviceId } from './lib/device-id'
 import {
   buildSubmitPayload,
+  formatCommentWithRisk,
   locationOffsetM,
   submissionBlock,
   type ReportDraft,
@@ -126,7 +127,7 @@ export function ReportPage() {
     let finalWeatherSnapshot = weatherSnapshot
     if (!finalWeatherSnapshot) {
       try {
-        const cur = await fetchWeatherCurrent(targetLat, targetLng) || getCachedWeather()
+        const cur = (await fetchWeatherCurrent(targetLat, targetLng).catch(() => null)) || getCachedWeather()
         if (cur && cur.temp_c != null) {
           finalWeatherSnapshot = {
             captured_at: new Date().toISOString(),
@@ -140,16 +141,8 @@ export function ReportPage() {
       }
     }
 
-    // Добавляем префикс выбранного риска в комментарий для модераторов
-    const riskPrefix =
-      riskSeverity === 'critical'
-        ? '[Критический риск / ЧС]'
-        : riskSeverity === 'elevated'
-          ? '[Высокий риск]'
-          : '[Умеренный риск]'
-
-    const rawComment = comment.trim()
-    const fullComment = rawComment ? `${riskPrefix} ${rawComment}` : riskPrefix
+    // Формируем комментарий с префиксом риска, гарантируя непревышение лимита 500 символов
+    const fullComment = formatCommentWithRisk(comment, riskSeverity)
 
     const payloadDraft = {
       ...draft,

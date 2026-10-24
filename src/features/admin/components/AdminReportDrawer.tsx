@@ -28,6 +28,7 @@ import {
   fetchReportHistory,
   updateReportStatus,
 } from '../admin-api'
+import { parseResidentRisk } from '../admin-utils'
 
 interface AdminReportDrawerProps {
   report: ReportWithTriage | null
@@ -95,10 +96,10 @@ export function AdminReportDrawer({
   const tempVal = weather?.temperature_c ?? weather?.temp_c
   const precipVal = weather?.precipitation_mm ?? weather?.precip_mm
 
-  const isCriticalRisk =
-    report.immediate_danger || (report.comment ?? '').includes('[Критический')
-  const isHighRisk = (report.comment ?? '').includes('[Высокий')
-  const isModerateRisk = (report.comment ?? '').includes('[Умеренный')
+  const residentRisk = parseResidentRisk(report)
+  const isCriticalRisk = residentRisk === 'critical'
+  const isHighRisk = residentRisk === 'elevated'
+  const isModerateRisk = residentRisk === 'moderate'
 
   // Обработчик сохранения статуса
   const handleSaveStatus = async () => {

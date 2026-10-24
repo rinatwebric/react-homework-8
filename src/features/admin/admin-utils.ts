@@ -50,6 +50,24 @@ export interface ReportFilterOptions {
   duplicateGroup?: string | null
 }
 
+export type ResidentRiskParsed = 'critical' | 'elevated' | 'moderate' | null
+
+/** Извлечение уровня риска жителя из отчёта и комментария */
+export function parseResidentRisk(
+  report: Pick<ReportWithTriage, 'immediate_danger' | 'comment'>,
+): ResidentRiskParsed {
+  if (report.immediate_danger || (report.comment ?? '').includes('[Критический')) {
+    return 'critical'
+  }
+  if ((report.comment ?? '').includes('[Высокий')) {
+    return 'elevated'
+  }
+  if ((report.comment ?? '').includes('[Умеренный')) {
+    return 'moderate'
+  }
+  return null
+}
+
 /** Фильтрация списка заявок */
 export function filterReports(
   reports: ReportWithTriage[],
@@ -73,10 +91,10 @@ export function filterReports(
     if (category !== 'all' && r.category_user !== category) return false
     if (dangerOnly && !r.immediate_danger) return false
     if (highRiskOnly) {
+      const residentRisk = parseResidentRisk(r)
       const isCriticalOrHigh =
-        r.immediate_danger ||
-        (r.comment ?? '').includes('[Высокий риск]') ||
-        (r.comment ?? '').includes('[Критический риск') ||
+        residentRisk === 'critical' ||
+        residentRisk === 'elevated' ||
         r.ai_triage?.urgency_ai === 'high' ||
         r.ai_triage?.urgency_ai === 'critical'
       if (!isCriticalOrHigh) return false

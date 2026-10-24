@@ -51,25 +51,32 @@ export async function showSystemNotification(
   if (!('Notification' in window)) return false
   if (Notification.permission !== 'granted') return false
 
+  const notificationOptions = {
+    icon: '/pwa-192x192.png',
+    badge: '/pwa-192x192.png',
+    vibrate: [200, 100, 200],
+    ...options,
+  }
+
   try {
     if ('serviceWorker' in navigator) {
-      // Ищем готовый service worker
-      const reg = await navigator.serviceWorker.ready
-      if (reg && 'showNotification' in reg) {
-        await reg.showNotification(title, {
-          icon: '/pwa-192x192.png',
-          badge: '/pwa-192x192.png',
-          ...options,
-        })
-        return true
+      try {
+        // Защита от вечного зависания ready: таймаут 1.5 секунды
+        const swReadyPromise = navigator.serviceWorker.ready
+        const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 1500))
+        const reg = await Promise.race([swReadyPromise, timeoutPromise])
+
+        if (reg && 'showNotification' in reg) {
+          await reg.showNotification(title, notificationOptions)
+          return true
+        }
+      } catch (swErr) {
+        console.warn('[notifications] Ошибка SW при показе уведомления:', swErr)
       }
     }
 
-    // Fallback на десктопный браузер, если SW ещё не готов
-    new Notification(title, {
-      icon: '/pwa-192x192.png',
-      ...options,
-    })
+    // Fallback на стандартный конструктор Notification для десктопов
+    new Notification(title, notificationOptions)
     return true
   } catch (err) {
     console.warn('[notifications] Ошибка отправки системного уведомления:', err)
@@ -102,10 +109,10 @@ export async function requestNotificationPermissionAndWelcome(): Promise<boolean
 /**
  * Проверка новых критических/предупредительных алертов и вызов push-уведомления
  */
-export async function notifyNewAlerts(alerts: AlertItem[]): Promise<void> {
-  if (typeof window === 'undefined' || !('Notification' in window)) return
-  if (Notification.permission !== 'granted') return
-  if (alerts.length === 0) return
+export async function notifyNewAlerts(alerts: AlertItem[]): Promise<boolean> {
+  if (typeof window === 'undefined' || !('Notification' in window)) return false
+  if (Notification.permission !== 'granted') return false
+  if (alerts.length === 0) return false
 
   let notifiedIds: string[] = []
   try {
@@ -115,16 +122,19 @@ export async function notifyNewAlerts(alerts: AlertItem[]): Promise<void> {
     notifiedIds = []
   }
 
-  const lastSeen = getAlertsLastSeen()
-  const newAlerts = alerts.filter(
-    (a) => !notifiedIds.includes(a.id) && new Date(a.created_at).getTime() > lastSeen,
-  )
+  // Свежие алерты за последние 24 часа, которые ещё не уведомляли пользователя
+  const cutoff24h = Date.now() - 24 * 60 * 60 * 1000
+  const newAlerts = alerts.filter((a) => {
+    if (notifiedIds.includes(a.id)) return false
+    const createdTime = new Date(a.created_at).getTime()
+    return !Number.isNaN(createdTime) && createdTime > cutoff24h
+  })
 
-  if (newAlerts.length === 0) return
+  if (newAlerts.length === 0) return false
 
   // Уведомляем о самом свежем
   const latest = newAlerts[0]
-  if (!latest) return
+  if (!latest) return false
 
   const levelText =
     latest.level === 'critical'
@@ -133,9 +143,9 @@ export async function notifyNewAlerts(alerts: AlertItem[]): Promise<void> {
         ? 'Внимание!'
         : 'Информация'
 
-  await showSystemNotification(`SuuTech: ${levelText}`, {
+  const sent = await showSystemNotification(`SuuTech: ${levelText}`, {
     body: `${latest.area ? `[${latest.area}] ` : ''}${latest.message}`,
-    tag: latest.id,
+    tag: `suutech-alert-${latest.id}`,
     data: { url: '/' },
   })
 
@@ -146,4 +156,6 @@ export async function notifyNewAlerts(alerts: AlertItem[]): Promise<void> {
   } catch {
     // ignore
   }
+
+  return sent
 }

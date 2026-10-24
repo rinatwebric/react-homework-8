@@ -65,19 +65,44 @@ export function HomePage() {
     lng: PILOT_ZONE.center.lng,
   })
 
-  // Загружаем недавние предупреждения службы
+  // Загружаем недавние предупреждения службы и обновляем при возвращении на вкладку
   useEffect(() => {
     let isMounted = true
-    void fetchRecentAlerts(48).then((data) => {
-      if (isMounted) {
+
+    const loadAlerts = async () => {
+      try {
+        const data = await fetchRecentAlerts(48)
+        if (!isMounted) return
         setAlerts(data)
         setUnreadCount(countUnreadAlerts(data))
         // Если есть свежие алерты и включены уведомления — отправляем системное уведомление на телефон
         void notifyNewAlerts(data)
+      } catch {
+        // offline / network issue
       }
-    })
+    }
+
+    void loadAlerts()
+
+    // Проверка при возвращении на экран
+    const handleVisibility = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        void loadAlerts()
+      }
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+
+    // Периодический опрос раз в 30 секунд для оперативного получения тревог без ручной перезагрузки
+    const interval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+        void loadAlerts()
+      }
+    }, 30000)
+
     return () => {
       isMounted = false
+      document.removeEventListener('visibilitychange', handleVisibility)
+      clearInterval(interval)
     }
   }, [])
 

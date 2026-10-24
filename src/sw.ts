@@ -70,6 +70,44 @@ registerRoute(
   }),
 )
 
+// Приём входящего Web Push уведомления при свёрнутом приложении
+self.addEventListener('push', (event: PushEvent) => {
+  let title = 'SuuTech: Оперативное оповещение'
+  let body = 'Поступило новое предупреждение о риске подтопления.'
+  let tag = 'suutech-push-alert'
+  let url = '/'
+
+  if (event.data) {
+    try {
+      const data = event.data.json() as {
+        title?: string
+        body?: string
+        message?: string
+        tag?: string
+        url?: string
+        level?: string
+      }
+      if (data.title) title = data.title
+      if (data.body || data.message) body = data.body || data.message || body
+      if (data.tag) tag = data.tag
+      if (data.url) url = data.url
+    } catch {
+      const text = event.data.text()
+      if (text) body = text
+    }
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon: '/pwa-192x192.png',
+      badge: '/pwa-192x192.png',
+      tag,
+      data: { url },
+    }),
+  )
+})
+
 // Клик по системному уведомлению на телефоне/десктопе
 self.addEventListener('notificationclick', (event: NotificationEvent) => {
   event.notification.close()
