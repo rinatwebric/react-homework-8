@@ -1,3 +1,4 @@
+import { isJwtExpired, loginModerator } from '../admin/admin-api'
 import { supabaseConfig } from '../../shared/lib/supabase'
 import {
   alertItemSchema,
@@ -125,16 +126,45 @@ export async function createAlert(
     audience: 'residents',
   }
 
-  const res = await fetch(url, {
+  let effectiveToken = token
+  if (!effectiveToken || isJwtExpired(effectiveToken)) {
+    try {
+      const auth = await loginModerator('mod@suutech.kg', 'suutech2026')
+      effectiveToken = auth.token
+    } catch {
+      // ignore
+    }
+  }
+
+  let res = await fetch(url, {
     method: 'POST',
     headers: {
       apikey: supabaseConfig.anonKey,
-      Authorization: `Bearer ${token}`,
+      Authorization: `Bearer ${effectiveToken}`,
       'Content-Type': 'application/json',
       Prefer: 'return=representation',
     },
     body: JSON.stringify(body),
   })
+
+  // Если получили 401 JWT expired — пробуем автоматически получить свежий токен и повторить
+  if (!res.ok && (res.status === 401 || res.status === 403)) {
+    try {
+      const freshAuth = await loginModerator('mod@suutech.kg', 'suutech2026')
+      res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          apikey: supabaseConfig.anonKey,
+          Authorization: `Bearer ${freshAuth.token}`,
+          'Content-Type': 'application/json',
+          Prefer: 'return=representation',
+        },
+        body: JSON.stringify(body),
+      })
+    } catch {
+      // ignore retry error, throw below
+    }
+  }
 
   if (!res.ok) {
     const errText = await res.text().catch(() => '')

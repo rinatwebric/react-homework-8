@@ -13,7 +13,7 @@ import type { AlertItem, AlertLevel } from '../../alerts/types'
 import { Button } from '../../../shared/ui/Button'
 import { Card } from '../../../shared/ui/Card'
 import { cx } from '../../../shared/lib/cx'
-import { getStoredModeratorToken, loginModerator } from '../admin-api'
+import { getStoredModeratorToken, getValidModeratorToken } from '../admin-api'
 import { showSystemNotification } from '../../home/lib/notification-service'
 
 type AdminAlertsTabProps = {
@@ -74,7 +74,7 @@ export function AdminAlertsTab({ onNotify }: AdminAlertsTabProps) {
   const loadAlerts = useCallback(async () => {
     setIsLoading(true)
     try {
-      const token = getStoredModeratorToken()
+      const token = await getValidModeratorToken().catch(() => getStoredModeratorToken())
       const data = await fetchAllAlerts(token)
       setAlerts(data)
     } catch (err) {
@@ -95,11 +95,7 @@ export function AdminAlertsTab({ onNotify }: AdminAlertsTabProps) {
 
     setIsSending(true)
     try {
-      let token = getStoredModeratorToken()
-      if (!token) {
-        const auth = await loginModerator('mod@suutech.kg', 'suutech2026')
-        token = auth.token
-      }
+      const token = await getValidModeratorToken()
 
       const created = await createAlert(
         {

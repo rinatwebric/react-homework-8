@@ -43,6 +43,34 @@ export function clearModeratorSession(): void {
   }
 }
 
+/** Проверка JWT на истечение срока действия по exp-клейму */
+export function isJwtExpired(token: string | null | undefined): boolean {
+  if (!token) return true
+  try {
+    const parts = token.split('.')
+    if (parts.length !== 3 || !parts[1]) return true
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+    const payloadJson = atob(base64)
+    const payload = JSON.parse(payloadJson) as { exp?: number }
+    if (typeof payload.exp !== 'number') return false
+    // Считаем истекшим, если осталось меньше 30 секунд
+    return Date.now() >= payload.exp * 1000 - 30000
+  } catch {
+    return true
+  }
+}
+
+/** Получение гарантированно действующего токена модератора с авто-логином при истечении */
+export async function getValidModeratorToken(): Promise<string> {
+  const currentToken = getStoredModeratorToken()
+  if (currentToken && !isJwtExpired(currentToken)) {
+    return currentToken
+  }
+  // Токен отсутствует или истёк — обновляем сессию
+  const auth = await loginModerator('mod@suutech.kg', 'suutech2026')
+  return auth.token
+}
+
 /** Авторизация модератора через Supabase Auth (GoTrue REST) */
 export async function loginModerator(email: string, password: string): Promise<{ token: string; email: string }> {
   if (!supabaseConfig) {
@@ -118,8 +146,8 @@ export async function fetchAdminReports(token?: string | null): Promise<ReportWi
 
   let effectiveToken = token || getStoredModeratorToken()
 
-  // Если токена нет — пробуем быстрый демо-вход, иначе публичный фолбек
-  if (!effectiveToken) {
+  // Если токена нет или он истёк — пробуем быстрый демо-вход, иначе публичный фолбек
+  if (!effectiveToken || isJwtExpired(effectiveToken)) {
     try {
       const auth = await loginModerator('mod@suutech.kg', 'suutech2026')
       effectiveToken = auth.token
@@ -170,8 +198,8 @@ export async function updateReportStatus(
 
   let effectiveToken = token || getStoredModeratorToken()
 
-  // Если токена нет — автоматически логинимся под демо-модератором
-  if (!effectiveToken) {
+  // Если токена нет или он истёк — автоматически логинимся под демо-модератором
+  if (!effectiveToken || isJwtExpired(effectiveToken)) {
     try {
       const auth = await loginModerator('mod@suutech.kg', 'suutech2026')
       effectiveToken = auth.token
