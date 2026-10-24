@@ -54,10 +54,10 @@ export function HomePage() {
       {/* Предупреждение о дожде при наличии риска */}
       {features.weather ? <RainWarningBanner weather={weather} /> : null}
 
-      {/* Компактный виджет погоды с переходом в новую вкладку «О воде» */}
+      {/* Компактный виджет погоды с переходом во вкладку «Погода» */}
       {features.weather && weather ? (
         <Link
-          to="/water"
+          to="/weather"
           className="flex items-center justify-between rounded-2xl border border-border bg-card p-3.5 shadow-sm transition-transform active:scale-[0.99] hover:border-brand/40"
         >
           <div className="flex items-center gap-2.5">
@@ -77,7 +77,7 @@ export function HomePage() {
             </div>
           </div>
           <span className="flex items-center gap-1 text-xs font-semibold text-brand">
-            {t('nav.water', 'О воде')} <ArrowRight className="size-3.5" />
+            {t('nav.weather', 'Погода')} <ArrowRight className="size-3.5" />
           </span>
         </Link>
       ) : null}

@@ -1,8 +1,8 @@
 import { Suspense, type ReactElement } from 'react'
-import { createBrowserRouter } from 'react-router-dom'
+import { Navigate, createBrowserRouter } from 'react-router-dom'
 import { HomePage } from '../features/home/HomePage'
 import { RouteErrorElement } from './ErrorBoundary'
-import { AdminPage, MapPage, ReportPage, WaterPage } from './lazyRoutes'
+import { AdminPage, MapPage, ReportPage, WeatherPage } from './lazyRoutes'
 import { NotFoundPage } from './NotFoundPage'
 import { RootRoute } from './RootRoute'
 import { RouteLoading } from './RouteLoading'
@@ -18,7 +18,8 @@ export const router = createBrowserRouter([
     errorElement: <RouteErrorElement />,
     children: [
       { index: true, element: <HomePage /> },
-      { path: 'water', element: withSuspense(<WaterPage />) },
+      { path: 'weather', element: withSuspense(<WeatherPage />) },
+      { path: 'water', element: <Navigate to="/weather" replace /> },
       { path: 'report', element: withSuspense(<ReportPage />) },
       { path: 'map', element: withSuspense(<MapPage />) },
       { path: '*', element: <NotFoundPage /> },
