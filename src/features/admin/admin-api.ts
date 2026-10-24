@@ -107,6 +107,9 @@ async function fetchPublicReportsFallback(): Promise<ReportWithTriage[]> {
   })
 }
 
+const ADMIN_SELECT_FIELDS =
+  'id,created_at,captured_at,lat,lng,lat_public,lng_public,zone_id,status,photo_path,is_demo,category_user,comment,immediate_danger,weather_snapshot,accuracy_m,location_adjusted_m,moderator_note,created_by'
+
 /** Загрузка заявок модератора */
 export async function fetchAdminReports(token?: string | null): Promise<ReportWithTriage[]> {
   if (!supabaseConfig) {
@@ -125,7 +128,7 @@ export async function fetchAdminReports(token?: string | null): Promise<ReportWi
     }
   }
 
-  const url = `${supabaseConfig.url.replace(/\/+$/, '')}/rest/v1/reports?select=*&order=created_at.desc`
+  const url = `${supabaseConfig.url.replace(/\/+$/, '')}/rest/v1/reports?select=${ADMIN_SELECT_FIELDS}&order=created_at.desc`
 
   const response = await fetch(url, {
     headers: {
@@ -136,9 +139,8 @@ export async function fetchAdminReports(token?: string | null): Promise<ReportWi
   })
 
   if (!response.ok) {
-    // Если сессия недействительна (401/403) — сбрасываем и загружаем публичные
+    // Если сессия не сработала — загружаем публичные данные (без сброса токена!)
     if (response.status === 401 || response.status === 403) {
-      clearModeratorSession()
       return fetchPublicReportsFallback()
     }
     throw new Error(`Ошибка загрузки заявок: ${response.status}`)
@@ -173,8 +175,9 @@ export async function updateReportStatus(
     try {
       const auth = await loginModerator('mod@suutech.kg', 'suutech2026')
       effectiveToken = auth.token
-    } catch {
-      throw new Error('Для изменения статуса необходим вход модератора (mod@suutech.kg / suutech2026)')
+    } catch (loginErr) {
+      const detail = loginErr instanceof Error ? loginErr.message : String(loginErr)
+      throw new Error(`Для изменения статуса необходим вход модератора: ${detail}`)
     }
   }
 
@@ -196,7 +199,6 @@ export async function updateReportStatus(
 
   // Если получили 401/403 — пробуем один раз обновить сессию через демо-аккаунт
   if (!response.ok && (response.status === 401 || response.status === 403)) {
-    clearModeratorSession()
     try {
       const auth = await loginModerator('mod@suutech.kg', 'suutech2026')
       effectiveToken = auth.token
