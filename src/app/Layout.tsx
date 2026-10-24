@@ -1,15 +1,16 @@
 /**
  * Оболочка приложения: контент + нижняя навигация по разделам v2.0
- * (главная и карта; заявка — CTA на главной).
+ * (главная, о воде / погода, карта; заявка — CTA на главной).
  * Mobile-first: телефон — основная ширина, на десктопе контент по центру.
  */
-import { Home, MapPin } from 'lucide-react'
+import { CloudRain, Home, MapPin } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { NavLink, Outlet } from 'react-router-dom'
 import { cx } from '../shared/lib/cx'
 
 const NAV_ITEMS = [
   { to: '/', labelKey: 'nav.home', icon: Home, end: true },
+  { to: '/water', labelKey: 'nav.water', icon: CloudRain, end: false },
   { to: '/map', labelKey: 'nav.map', icon: MapPin, end: false },
 ] as const
 

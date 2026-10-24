@@ -105,3 +105,17 @@
   font-weight: 600;
   box-shadow: 0 1px 8px rgb(18 58 92 / 0.35);
 }
+
+
+@keyframes toastProgress {
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
+}
+
+.animate-toast-progress {
+  animation: toastProgress 4s linear forwards;
+}

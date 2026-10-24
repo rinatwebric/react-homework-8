@@ -8,7 +8,6 @@ import { createClientId } from '../../shared/lib/client-id'
 import { Banner } from '../../shared/ui/Banner'
 import { Button } from '../../shared/ui/Button'
 import { Card } from '../../shared/ui/Card'
-import { EmergencyCallButton } from '../../shared/ui/EmergencyCallButton'
 import { ErrorState } from '../../shared/ui/ErrorState'
 import { ScreenHeader } from '../../shared/ui/ScreenHeader'
 import { readReportContext } from '../../shared/types/report-context'
@@ -38,7 +37,6 @@ import { SubmitReportError, submitReport, type SubmitReportErrorCode } from './l
  * отметка «опасно для жизни».
  * Срез 3: при наличии погодных данных снимок погоды (weather_snapshot)
  * автоматически прикрепляется к заявке (если недоступен — null, отправка не блокируется).
- * Кнопка 112 вынесена для экстренных ситуаций.
  */
 export function ReportPage() {
   const { t } = useTranslation()
@@ -141,8 +139,6 @@ export function ReportPage() {
     <div className="space-y-4">
       <ScreenHeader title={t('report.title')} />
       <p className="-mt-2 text-sm leading-snug text-muted-foreground">{t('report.lead')}</p>
-
-      <EmergencyCallButton />
 
       <CategoryPicker value={category} onChange={setCategory} />
 

@@ -1,4 +1,4 @@
-import { ArrowRight, Bell, MapPin, Plus } from 'lucide-react'
+import { ArrowRight, Bell, CloudRain, MapPin, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
@@ -13,7 +13,6 @@ import { EmergencyCallButton } from '../../shared/ui/EmergencyCallButton'
 import { IconTile } from '../../shared/ui/IconTile'
 import { RiskScale } from '../../shared/ui/RiskScale'
 import { RainWarningBanner } from '../weather/components/RainWarningBanner'
-import { WeatherCard } from '../weather/components/WeatherCard'
 import { useWeather } from '../weather/hooks/useWeather'
 
 const TILES = [
@@ -21,11 +20,11 @@ const TILES = [
   { to: '/report', icon: Plus, titleKey: 'home.tiles.reportTitle', textKey: 'home.tiles.reportText' },
 ] as const
 
-/** Главная: село, погода Open-Meteo, экстренная помощь 112, плитки разделов и риск (Срез 3). */
+/** Главная: село, риск подтопления, компактная сводка погоды с переходом в «О воде», экстренная помощь 112. */
 export function HomePage() {
   const { t } = useTranslation()
   const [alertsOpen, setAlertsOpen] = useState(false)
-  const { weather, loading, refresh } = useWeather({
+  const { weather } = useWeather({
     lat: PILOT_ZONE.center.lat,
     lng: PILOT_ZONE.center.lng,
   })
@@ -52,11 +51,35 @@ export function HomePage() {
 
       {alertsOpen ? <Banner tone="info">{t('home.bellNote')}</Banner> : null}
 
-      {features.weather ? (
-        <>
-          <RainWarningBanner weather={weather} />
-          <WeatherCard weather={weather} loading={loading} onRefresh={() => void refresh()} />
-        </>
+      {/* Предупреждение о дожде при наличии риска */}
+      {features.weather ? <RainWarningBanner weather={weather} /> : null}
+
+      {/* Компактный виджет погоды с переходом в новую вкладку «О воде» */}
+      {features.weather && weather ? (
+        <Link
+          to="/water"
+          className="flex items-center justify-between rounded-2xl border border-border bg-card p-3.5 shadow-sm transition-transform active:scale-[0.99] hover:border-brand/40"
+        >
+          <div className="flex items-center gap-2.5">
+            <div className="flex size-9 items-center justify-center rounded-xl bg-brand-soft text-brand">
+              <CloudRain className="size-5" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-muted-foreground">
+                {t('weather.title', 'Погода в селе')}
+              </p>
+              <p className="text-sm font-bold text-ink">
+                {weather.temp_c != null ? `${weather.temp_c}°C` : '—'}
+                {weather.precip_mm != null && weather.precip_mm > 0
+                  ? ` · ${weather.precip_mm} мм осадков`
+                  : ' · Без осадков'}
+              </p>
+            </div>
+          </div>
+          <span className="flex items-center gap-1 text-xs font-semibold text-brand">
+            {t('nav.water', 'О воде')} <ArrowRight className="size-3.5" />
+          </span>
+        </Link>
       ) : null}
 
       <EmergencyCallButton />
@@ -98,15 +121,6 @@ export function HomePage() {
           <p className="text-[15px] leading-snug text-ink">{t('home.tipText')}</p>
         </div>
       </Card>
-
-      <Banner tone="warning">{t('home.disclaimer')}</Banner>
-
-      <Link
-        to="/admin"
-        className="block py-2 text-center text-sm font-medium text-brand underline-offset-4 hover:underline"
-      >
-        {t('footer.adminLink')}
-      </Link>
     </div>
   )
 }
