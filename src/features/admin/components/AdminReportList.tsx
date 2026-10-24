@@ -1,17 +1,14 @@
 import {
   AlertTriangle,
   Camera,
-  Copy,
+  CloudRain,
   Inbox,
-  Sparkles,
+  Thermometer,
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
   CATEGORY_LABELS_RU,
   CATEGORY_META,
-  URGENCY_LABELS_RU,
-  URGENCY_META,
-  type UrgencyLevel,
 } from '../../../shared/lib/categories'
 import { cx } from '../../../shared/lib/cx'
 import type { ReportStatus, ReportWithTriage } from '../../../shared/types/database'
@@ -20,7 +17,6 @@ interface AdminReportListProps {
   reports: ReportWithTriage[]
   selectedReportId: string | null
   onSelectReport: (report: ReportWithTriage) => void
-  onFilterByDuplicateGroup?: (group: string) => void
 }
 
 const STATUS_BADGE: Record<ReportStatus, { label: string; className: string }> = {
@@ -36,7 +32,6 @@ export function AdminReportList({
   reports,
   selectedReportId,
   onSelectReport,
-  onFilterByDuplicateGroup,
 }: AdminReportListProps) {
   const { t } = useTranslation()
 
@@ -60,9 +55,6 @@ export function AdminReportList({
         const isSelected = report.id === selectedReportId
         const catMeta = report.category_user ? CATEGORY_META[report.category_user] : null
         const Icon = catMeta?.icon ?? Inbox
-        const urgencyMeta = report.ai_triage?.urgency_ai
-          ? URGENCY_META[report.ai_triage.urgency_ai as UrgencyLevel]
-          : null
         const statusConfig = STATUS_BADGE[report.status] ?? STATUS_BADGE.new
 
         const dateStr = new Date(report.created_at).toLocaleString('ru-RU', {
@@ -73,14 +65,15 @@ export function AdminReportList({
         })
 
         const categoryTitle = report.category_user
-          ? t(`categories.items.${report.category_user}.title`, { defaultValue: CATEGORY_LABELS_RU[report.category_user] })
+          ? t(`categories.items.${report.category_user}.title`, {
+              defaultValue: CATEGORY_LABELS_RU[report.category_user],
+            })
           : t('admin.list.noCategory', 'Без категории')
 
-        const urgencyLabel = report.ai_triage?.urgency_ai
-          ? t(`categories.urgency.${report.ai_triage.urgency_ai}`, {
-              defaultValue: URGENCY_LABELS_RU[report.ai_triage.urgency_ai as UrgencyLevel] || report.ai_triage.urgency_ai,
-            })
-          : null
+        const weather = report.weather_snapshot as {
+          temp_c?: number
+          precip_mm?: number
+        } | null
 
         return (
           <div
@@ -95,8 +88,10 @@ export function AdminReportList({
               }
             }}
             className={cx(
-              'group relative flex cursor-pointer flex-col gap-2 rounded-2xl border bg-card p-3.5 transition-all hover:border-brand-deep/50 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-deep',
-              isSelected ? 'border-brand-deep ring-2 ring-brand-deep/20 shadow-sm' : 'border-border',
+              'group relative flex cursor-pointer flex-col gap-2 rounded-2xl border bg-card p-4 transition-all hover:border-brand-deep/50 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-deep',
+              isSelected
+                ? 'border-brand-deep ring-2 ring-brand-deep/20 shadow-sm'
+                : 'border-border',
             )}
           >
             {/* Верхняя строка: Категория, Статус, Дата */}
@@ -155,15 +150,11 @@ export function AdminReportList({
               </div>
             </div>
 
-            {/* Средняя строка: Комментарий жителя или AI резюме */}
+            {/* Средняя строка: Комментарий жителя */}
             <div className="text-sm">
               {report.comment ? (
                 <p className="line-clamp-2 text-ink font-normal leading-snug">
                   «{report.comment}»
-                </p>
-              ) : report.ai_triage?.summary ? (
-                <p className="line-clamp-2 text-xs italic text-muted-foreground">
-                  AI: {report.ai_triage.summary}
                 </p>
               ) : (
                 <p className="text-xs italic text-muted-foreground">
@@ -172,46 +163,26 @@ export function AdminReportList({
               )}
             </div>
 
-            {/* Нижняя строка: AI-триаж метаданные (срочность, уверенность, дубликаты) */}
-            <div className="mt-1 flex flex-wrap items-center justify-between gap-2 border-t border-border/50 pt-2 text-xs">
-              <div className="flex flex-wrap items-center gap-1.5">
-                {/* Бейдж AI-срочности */}
-                {urgencyMeta && urgencyLabel && (
-                  <span
-                    className={cx(
-                      'rounded-md border px-1.5 py-0.5 text-[11px] font-bold',
-                      urgencyMeta.badge,
+            {/* Нижняя строка: Метаданные (Погода, ID, Заметка) */}
+            <div className="mt-1 flex flex-wrap items-center justify-between gap-2 border-t border-border/50 pt-2 text-xs text-muted-foreground">
+              <div className="flex items-center gap-3">
+                {weather && (
+                  <span className="flex items-center gap-1 text-[11px]">
+                    <Thermometer className="size-3 text-brand-deep" />
+                    {weather.temp_c != null ? `${weather.temp_c}°C` : ''}
+                    {weather.precip_mm != null && weather.precip_mm > 0 && (
+                      <span className="flex items-center gap-0.5 text-blue-600">
+                        <CloudRain className="size-3 ml-1" />
+                        {weather.precip_mm} мм
+                      </span>
                     )}
-                  >
-                    {urgencyLabel}
                   </span>
                 )}
 
-                {/* AI сомнения / Проверка человеком */}
-                {report.ai_triage?.needs_human_review && (
-                  <span
-                    className="flex items-center gap-1 rounded-md border border-purple-200 bg-purple-50 px-1.5 py-0.5 text-[10px] font-semibold text-purple-800"
-                    title={t('admin.list.needsReviewHint', 'AI рекомендует проверку человеком')}
-                  >
-                    <Sparkles className="size-2.5 text-purple-600" />
-                    {t('admin.list.needsReview', 'Проверка')}
+                {report.moderator_note && (
+                  <span className="truncate max-w-[200px] text-[11px] italic text-muted-foreground">
+                    Заметка: {report.moderator_note}
                   </span>
-                )}
-
-                {/* Группа дубликатов */}
-                {report.ai_triage?.duplicate_group && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onFilterByDuplicateGroup?.(report.ai_triage!.duplicate_group!)
-                    }}
-                    className="flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-800 hover:bg-amber-100"
-                    title={t('admin.list.filterGroupHint', 'Нажмите для фильтра по группе дубликатов')}
-                  >
-                    <Copy className="size-2.5" />
-                    {report.ai_triage.duplicate_group}
-                  </button>
                 )}
               </div>
 

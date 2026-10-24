@@ -41,10 +41,11 @@ export function calculateAdminKpi(reports: ReportWithTriage[]): AdminKpiStats {
 
 export interface ReportFilterOptions {
   status?: ReportStatus | 'all'
-  urgency?: UrgencyLevel | 'all'
   category?: ReportCategory | 'all'
-  needsReviewOnly?: boolean
+  dangerOnly?: boolean
   search?: string
+  urgency?: UrgencyLevel | 'all'
+  needsReviewOnly?: boolean
   duplicateGroup?: string | null
 }
 
@@ -55,10 +56,11 @@ export function filterReports(
 ): ReportWithTriage[] {
   const {
     status = 'all',
-    urgency = 'all',
     category = 'all',
-    needsReviewOnly = false,
+    dangerOnly = false,
     search = '',
+    urgency = 'all',
+    needsReviewOnly = false,
     duplicateGroup,
   } = options
 
@@ -66,16 +68,17 @@ export function filterReports(
 
   return reports.filter((r) => {
     if (status !== 'all' && r.status !== status) return false
-    if (urgency !== 'all' && r.ai_triage?.urgency_ai !== urgency) return false
     if (category !== 'all' && r.category_user !== category) return false
+    if (dangerOnly && !r.immediate_danger) return false
+    if (urgency !== 'all' && r.ai_triage?.urgency_ai !== urgency) return false
     if (needsReviewOnly && !r.ai_triage?.needs_human_review) return false
     if (duplicateGroup && r.ai_triage?.duplicate_group !== duplicateGroup) return false
 
     if (searchLower) {
       const commentMatch = (r.comment ?? '').toLowerCase().includes(searchLower)
       const idMatch = r.id.toLowerCase().includes(searchLower)
-      const summaryMatch = (r.ai_triage?.summary ?? '').toLowerCase().includes(searchLower)
-      if (!commentMatch && !idMatch && !summaryMatch) return false
+      const noteMatch = (r.moderator_note ?? '').toLowerCase().includes(searchLower)
+      if (!commentMatch && !idMatch && !noteMatch) return false
     }
 
     return true

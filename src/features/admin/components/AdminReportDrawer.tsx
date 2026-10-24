@@ -3,14 +3,10 @@ import {
   Camera,
   Check,
   CloudRain,
-  Copy,
   ExternalLink,
   History,
   MapPin,
-  RefreshCw,
-  Sparkles,
   Thermometer,
-  UserCheck,
   X,
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
@@ -18,9 +14,6 @@ import { useTranslation } from 'react-i18next'
 import {
   CATEGORY_LABELS_RU,
   CATEGORY_META,
-  URGENCY_LABELS_RU,
-  URGENCY_META,
-  type UrgencyLevel,
 } from '../../../shared/lib/categories'
 import { cx } from '../../../shared/lib/cx'
 import { getReportPhotoUrl } from '../../../shared/lib/storage'
@@ -33,7 +26,6 @@ import type {
 } from '../../../shared/types/database'
 import {
   fetchReportHistory,
-  triggerAiTriage,
   updateReportStatus,
 } from '../admin-api'
 
@@ -41,7 +33,7 @@ interface AdminReportDrawerProps {
   report: ReportWithTriage | null
   onClose: () => void
   onReportUpdated: (updated: ReportWithTriage) => void
-  onFilterByDuplicateGroup?: (group: string) => void
+  onNotify?: (type: 'success' | 'error' | 'info', title: string, message?: string) => void
 }
 
 const STATUS_OPTIONS: { id: ReportStatus; label: string }[] = [
@@ -57,14 +49,13 @@ export function AdminReportDrawer({
   report,
   onClose,
   onReportUpdated,
-  onFilterByDuplicateGroup,
+  onNotify,
 }: AdminReportDrawerProps) {
-  const { t, i18n } = useTranslation()
+  const { t } = useTranslation()
 
   const [currentStatus, setCurrentStatus] = useState<ReportStatus>('new')
   const [moderatorNote, setModeratorNote] = useState<string>('')
   const [isSavingStatus, setIsSavingStatus] = useState<boolean>(false)
-  const [isRerunningTriage, setIsRerunningTriage] = useState<boolean>(false)
   const [history, setHistory] = useState<ReportStatusHistoryRow[]>([])
   const [isLoadingHistory, setIsLoadingHistory] = useState<boolean>(false)
   const [saveSuccess, setSaveSuccess] = useState<boolean>(false)
@@ -90,9 +81,6 @@ export function AdminReportDrawer({
 
   const catMeta = report.category_user ? CATEGORY_META[report.category_user] : null
   const CatIcon = catMeta?.icon ?? MapPin
-  const urgencyMeta = report.ai_triage?.urgency_ai
-    ? URGENCY_META[report.ai_triage.urgency_ai as UrgencyLevel]
-    : null
   const photoUrl = getReportPhotoUrl(report.photo_path)
 
   const weather = report.weather_snapshot as {
@@ -118,114 +106,96 @@ export function AdminReportDrawer({
       }
       onReportUpdated(updatedReport)
 
+      const statusName = STATUS_OPTIONS.find((s) => s.id === currentStatus)?.label || currentStatus
+      onNotify?.('success', 'Статус сохранён', `Заявка переведена в статус: ${statusName}`)
+
       // Обновляем историю
       const updatedHistory = await fetchReportHistory(report.id)
       setHistory(updatedHistory)
     } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : 'Ошибка при сохранении')
+      const msg = err instanceof Error ? err.message : 'Ошибка при сохранении'
+      setErrorMessage(msg)
+      onNotify?.('error', 'Не удалось обновить статус', msg)
     } finally {
       setIsSavingStatus(false)
     }
   }
 
-  // Обработчик перезапуска AI-триажа
-  const handleRerunTriage = async () => {
-    setIsRerunningTriage(true)
-    setErrorMessage(null)
-
-    try {
-      const lang = i18n.language === 'ky' ? 'ky' : 'ru'
-      const triage = await triggerAiTriage(report.id, lang)
-
-      const updatedReport: ReportWithTriage = {
-        ...report,
-        ai_triage: {
-          report_id: report.id,
-          category_ai: triage.category,
-          urgency_ai: triage.urgency,
-          summary: triage.summary,
-          recommended_action: triage.recommended_action,
-          duplicate_group: triage.duplicate_group,
-          confidence: triage.confidence,
-          needs_human_review: triage.needs_human_review,
-          model: 'gemini-1.5-flash',
-          created_at: new Date().toISOString(),
-        },
-      }
-      onReportUpdated(updatedReport)
-    } catch (err) {
-      setErrorMessage(err instanceof Error ? err.message : 'Ошибка перезапуска триажа')
-    } finally {
-      setIsRerunningTriage(false)
-    }
-  }
-
   const categoryTitle = report.category_user
-    ? t(`categories.items.${report.category_user}.title`, { defaultValue: CATEGORY_LABELS_RU[report.category_user] })
-    : t('admin.list.noCategory', 'Категория не указана')
-
-  const triageCategoryTitle = report.ai_triage?.category_ai
-    ? t(`categories.items.${report.ai_triage.category_ai}.title`, { defaultValue: CATEGORY_LABELS_RU[report.ai_triage.category_ai] })
-    : '—'
-
-  const triageUrgencyTitle = report.ai_triage?.urgency_ai
-    ? t(`categories.urgency.${report.ai_triage.urgency_ai}`, { defaultValue: URGENCY_LABELS_RU[report.ai_triage.urgency_ai as UrgencyLevel] })
-    : '—'
+    ? t(`categories.items.${report.category_user}.title`, {
+        defaultValue: CATEGORY_LABELS_RU[report.category_user],
+      })
+    : t('admin.drawer.noCategory', 'Не указана')
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-ink/50 backdrop-blur-xs transition-opacity">
-      <div className="relative flex h-full w-full max-w-xl flex-col bg-background shadow-2xl overflow-y-auto">
-        {/* Заголовок карточки */}
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="drawer-title"
+      className="fixed inset-0 z-50 flex justify-end bg-ink/40 backdrop-blur-xs transition-opacity"
+    >
+      <div
+        className="relative flex h-full w-full max-w-xl flex-col bg-card shadow-2xl overflow-y-auto"
+        tabIndex={-1}
+      >
+        {/* Шапка модалки */}
         <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-card/95 px-5 py-4 backdrop-blur-sm">
           <div className="flex items-center gap-2">
-            <span className="font-mono text-xs font-bold text-muted-foreground">
+            <h2 id="drawer-title" className="text-base font-bold text-ink">
+              {t('admin.drawer.title', 'Карточка заявки')}
+            </h2>
+            <span className="font-mono text-xs text-muted-foreground">
               #{report.id.slice(0, 8)}
             </span>
             {report.is_demo && <DemoTag />}
           </div>
+
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl p-1.5 text-muted-foreground hover:bg-muted hover:text-ink"
-            aria-label={t('common.close', 'Закрыть')}
+            className="rounded-xl p-1.5 text-muted-foreground hover:bg-muted hover:text-ink transition-colors"
+            title={t('common.close', 'Закрыть')}
           >
             <X className="size-5" />
           </button>
         </div>
 
-        <div className="flex-1 space-y-5 p-5">
+        {/* Тело карточки */}
+        <div className="flex-1 space-y-6 p-5">
+          {/* Сообщение об ошибке или успехе */}
           {errorMessage && (
-            <div className="rounded-xl border border-rose-300 bg-rose-50 p-3 text-xs text-rose-900">
-              {errorMessage}
+            <div className="rounded-xl border border-rose-300 bg-rose-50 p-3.5 text-xs text-rose-950 flex items-start gap-2 shadow-xs">
+              <AlertTriangle className="size-4 text-rose-600 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="font-bold">{t('admin.drawer.errorTitle', 'Ошибка:')}</p>
+                <p className="mt-0.5">{errorMessage}</p>
+              </div>
             </div>
           )}
 
-          {/* Предупреждение 112 при непосредственной опасности */}
-          {report.immediate_danger && (
-            <div className="flex items-start gap-3 rounded-2xl border border-rose-300 bg-rose-50 p-4 text-rose-950">
-              <AlertTriangle className="size-5 shrink-0 text-rose-600" />
-              <div>
-                <p className="text-sm font-bold">
-                  {t('admin.drawer.immediateDangerTitle', 'Непосредственная опасность жителю / дому!')}
-                </p>
-                <p className="mt-1 text-xs text-rose-900 leading-relaxed">
-                  {t(
-                    'admin.drawer.immediateDangerDesc',
-                    'Заявитель отметил угрозу жизни или строению. Рекомендуется немедленная координация с дежурной частью 112.',
-                  )}
-                </p>
-              </div>
+          {saveSuccess && (
+            <div className="rounded-xl border border-emerald-300 bg-emerald-50 p-3 text-xs font-semibold text-emerald-950 flex items-center gap-2 shadow-xs">
+              <Check className="size-4 text-emerald-600 shrink-0" />
+              <span>{t('admin.drawer.saveSuccess', 'Статус заявки успешно обновлен.')}</span>
             </div>
           )}
 
           {/* Раздел 1: Данные жителя */}
           <div className="space-y-3">
-            <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-              {t('admin.drawer.residentData', 'Сообщение жителя')}
-            </h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                {t('admin.drawer.citizenData', 'Данные жителя')}
+              </h3>
+              {report.immediate_danger && (
+                <span className="flex items-center gap-1 rounded-md border border-rose-300 bg-rose-50 px-2 py-0.5 text-xs font-bold text-rose-700 animate-pulse">
+                  <AlertTriangle className="size-3.5" />
+                  {t('admin.drawer.dangerWarning', 'Опасность для жизни (112)')}
+                </span>
+              )}
+            </div>
 
             {/* Категория жителя */}
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
               {catMeta ? (
                 <div
                   className={cx(
@@ -248,7 +218,7 @@ export function AdminReportDrawer({
             </div>
 
             {/* Комментарий жителя */}
-            <div className="rounded-2xl border border-border bg-card p-4">
+            <div className="rounded-2xl border border-border bg-background p-4">
               <p className="text-xs font-semibold text-muted-foreground mb-1">
                 {t('admin.drawer.commentLabel', 'Текст комментария:')}
               </p>
@@ -301,9 +271,9 @@ export function AdminReportDrawer({
                     href={`https://www.openstreetmap.org/?mlat=${report.lat}&mlon=${report.lng}#map=17/${report.lat}/${report.lng}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex items-center gap-1 text-[11px] font-medium text-brand-deep hover:underline"
+                    className="flex items-center gap-1 text-[11px] font-semibold text-brand-deep hover:underline"
                   >
-                    OSM <ExternalLink className="size-3" />
+                    Открыть на карте <ExternalLink className="size-3" />
                   </a>
                 )}
               </div>
@@ -325,7 +295,7 @@ export function AdminReportDrawer({
                 <img
                   src={photoUrl}
                   alt={report.comment ?? 'Фото заявки'}
-                  className="max-h-64 w-full object-cover bg-black/5"
+                  className="max-h-72 w-full object-cover bg-black/5"
                   loading="lazy"
                 />
               </div>
@@ -334,157 +304,51 @@ export function AdminReportDrawer({
 
           <hr className="border-border" />
 
-          {/* Раздел 2: Блок AI-триажа */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <h3 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-purple-900">
-                <Sparkles className="size-3.5 text-purple-600" />
-                {t('admin.drawer.triageTitle', 'AI-триаж диспетчера')}
-              </h3>
-
-              <Button
-                variant="outline"
-                size="md"
-                onClick={handleRerunTriage}
-                disabled={isRerunningTriage}
-                className="text-xs h-8 min-h-8 gap-1 px-2.5"
-              >
-                <RefreshCw className={cx('size-3', isRerunningTriage && 'animate-spin')} />
-                {isRerunningTriage
-                  ? t('admin.drawer.runningTriage', 'Анализ...')
-                  : t('admin.drawer.rerunTriage', 'Запустить заново')}
-              </Button>
-            </div>
-
-            {report.ai_triage ? (
-              <div className="rounded-2xl border border-purple-200 bg-purple-50/50 p-4 space-y-3 text-xs">
-                {/* Бейджи категории и срочности */}
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-semibold text-purple-950">
-                    {t('admin.drawer.proposedCategory', 'Категория:')}
-                  </span>
-                  <span className="rounded-md border border-purple-300 bg-purple-100 px-2 py-0.5 font-bold text-purple-900">
-                    {triageCategoryTitle}
-                  </span>
-
-                  <span className="font-semibold text-purple-950 ml-2">
-                    {t('admin.drawer.proposedUrgency', 'Срочность:')}
-                  </span>
-                  {urgencyMeta && (
-                    <span className={cx('rounded-md border px-2 py-0.5 font-bold', urgencyMeta.badge)}>
-                      {triageUrgencyTitle}
-                    </span>
-                  )}
-
-                  {report.ai_triage.confidence != null && (
-                    <span className="ml-auto text-purple-700 font-medium">
-                      Уверенность: {Math.round(report.ai_triage.confidence * 100)}%
-                    </span>
-                  )}
-                </div>
-
-                {/* AI Резюме */}
-                <div>
-                  <p className="font-semibold text-purple-950 mb-0.5">
-                    {t('admin.drawer.summaryLabel', 'Резюме диспетчера:')}
-                  </p>
-                  <p className="text-purple-900 leading-relaxed bg-white/70 rounded-xl p-2.5 border border-purple-100">
-                    {report.ai_triage.summary || '—'}
-                  </p>
-                </div>
-
-                {/* Рекомендуемое действие */}
-                <div>
-                  <p className="font-semibold text-purple-950 mb-0.5">
-                    {t('admin.drawer.actionLabel', 'Рекомендуемое действие:')}
-                  </p>
-                  <p className="text-purple-900 font-medium leading-relaxed bg-white/70 rounded-xl p-2.5 border border-purple-100">
-                    {report.ai_triage.recommended_action || '—'}
-                  </p>
-                </div>
-
-                {/* Группа дубликатов */}
-                {report.ai_triage.duplicate_group && (
-                  <div className="flex items-center justify-between rounded-xl border border-amber-300 bg-amber-50 p-2.5">
-                    <span className="flex items-center gap-1.5 font-medium text-amber-950">
-                      <Copy className="size-3.5 text-amber-700" />
-                      Группа дубликатов: <strong>{report.ai_triage.duplicate_group}</strong>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => onFilterByDuplicateGroup?.(report.ai_triage!.duplicate_group!)}
-                      className="rounded-lg bg-amber-200/80 px-2 py-1 text-[11px] font-bold text-amber-950 hover:bg-amber-300"
-                    >
-                      {t('admin.drawer.filterSimilar', 'Показать похожие')}
-                    </button>
-                  </div>
-                )}
-
-                {/* Плашка необходимости проверки человеком */}
-                {report.ai_triage.needs_human_review && (
-                  <div className="flex items-center gap-2 text-[11px] text-purple-800 bg-purple-100/70 rounded-lg px-2.5 py-1.5">
-                    <UserCheck className="size-3.5 text-purple-700" />
-                    <span>{t('admin.drawer.needsReviewNotice', 'Флаг: рекомендуется контрольная проверка оператором.')}</span>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-dashed border-border p-5 text-center text-xs text-muted-foreground">
-                <p>{t('admin.drawer.noTriage', 'AI-триаж ещё не выполнялся для этой заявки.')}</p>
-                <Button
-                  variant="outline"
-                  size="md"
-                  onClick={handleRerunTriage}
-                  disabled={isRerunningTriage}
-                  className="mt-2 text-xs h-8 min-h-8"
-                >
-                  {isRerunningTriage ? 'Запуск...' : 'Запустить AI-триаж'}
-                </Button>
-              </div>
-            )}
-          </div>
-
-          <hr className="border-border" />
-
-          {/* Раздел 3: Управление статусом модератором */}
+          {/* Раздел 2: Управление статусом модератором */}
           <div className="space-y-4">
             <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
               {t('admin.drawer.moderatorControl', 'Решение модератора')}
             </h3>
 
-            {/* Выбор статуса */}
+            {/* Выбор статуса: исправленные контрастные кнопки */}
             <div>
-              <label className="block text-xs font-semibold text-ink mb-1.5">
+              <label className="block text-xs font-bold text-ink mb-1.5">
                 {t('admin.drawer.selectStatus', 'Текущий статус заявки:')}
               </label>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                {STATUS_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => setCurrentStatus(opt.id)}
-                    className={cx(
-                      'rounded-xl border p-2 text-xs font-semibold transition-all text-center',
-                      currentStatus === opt.id
-                        ? 'border-brand-deep bg-brand-deep text-white shadow-xs'
-                        : 'border-border bg-card text-ink hover:bg-muted/50',
-                    )}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
+                {STATUS_OPTIONS.map((opt) => {
+                  const isSelected = currentStatus === opt.id
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setCurrentStatus(opt.id)}
+                      className={cx(
+                        'rounded-xl border p-2.5 text-xs transition-all text-center select-none shadow-xs',
+                        isSelected
+                          ? 'border-ink bg-ink text-white font-bold ring-2 ring-ink/30 scale-[1.02]'
+                          : 'border-border bg-card text-ink font-medium hover:bg-brand-soft/70 hover:border-brand/40',
+                      )}
+                    >
+                      {opt.label}
+                    </button>
+                  )
+                })}
               </div>
             </div>
 
             {/* Заметка модератора */}
             <div>
-              <label className="block text-xs font-semibold text-ink mb-1.5">
+              <label className="block text-xs font-bold text-ink mb-1.5">
                 {t('admin.drawer.moderatorNote', 'Заметка модератора (будет записана в историю):')}
               </label>
               <textarea
                 value={moderatorNote}
                 onChange={(e) => setModeratorNote(e.target.value)}
-                placeholder={t('admin.drawer.notePlaceholder', 'Причина смены статуса, назначенная бригада, комментарий...')}
+                placeholder={t(
+                  'admin.drawer.notePlaceholder',
+                  'Причина смены статуса, назначенная бригада, комментарий...',
+                )}
                 rows={3}
                 className="w-full rounded-xl border border-border bg-background p-3 text-xs text-ink placeholder:text-muted-foreground focus:border-brand-deep focus:outline-none focus:ring-1 focus:ring-brand-deep"
               />
@@ -496,53 +360,71 @@ export function AdminReportDrawer({
                 variant="primary"
                 onClick={handleSaveStatus}
                 disabled={isSavingStatus}
-                className="w-full"
+                className="w-full font-bold py-2.5"
               >
-                {isSavingStatus ? t('common.saving', 'Сохранение...') : t('admin.drawer.saveStatus', 'Сохранить статус и заметку')}
+                {isSavingStatus ? (
+                  t('common.saving', 'Сохранение...')
+                ) : (
+                  <>
+                    <Check className="size-4 mr-1.5" />
+                    {t('admin.drawer.saveStatusBtn', 'Сохранить решение')}
+                  </>
+                )}
               </Button>
-              {saveSuccess && (
-                <span className="flex items-center gap-1 text-xs font-semibold text-emerald-600">
-                  <Check className="size-4" />
-                  {t('common.saved', 'Сохранено')}
-                </span>
-              )}
             </div>
+          </div>
 
-            {/* История переходов статусов */}
-            <div className="mt-4 pt-4 border-t border-border">
-              <h4 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">
-                <History className="size-3.5" />
-                {t('admin.drawer.historyTitle', 'История изменений')}
-              </h4>
+          <hr className="border-border" />
 
-              {isLoadingHistory ? (
-                <p className="text-xs text-muted-foreground">{t('common.loading', 'Загрузка истории...')}</p>
-              ) : history.length > 0 ? (
-                <ol className="relative border-l border-border/70 ml-2 space-y-3 text-xs">
-                  {history.map((h) => (
-                    <li key={h.id} className="ml-4">
-                      <div className="absolute -left-1.5 mt-1 size-3 rounded-full border border-background bg-brand-deep" />
-                      <div className="font-semibold text-ink">
-                        {h.from_status ? `${h.from_status} → ` : ''}
-                        <span className="text-brand-deep">{h.to_status}</span>
+          {/* Раздел 3: История статусов */}
+          <div className="space-y-3">
+            <h3 className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              <History className="size-3.5 text-muted-foreground" />
+              {t('admin.drawer.historyTitle', 'История изменений')}
+            </h3>
+
+            {isLoadingHistory ? (
+              <p className="text-xs text-muted-foreground">
+                {t('common.loading', 'Загрузка...')}
+              </p>
+            ) : history.length === 0 ? (
+              <p className="text-xs italic text-muted-foreground">
+                {t('admin.drawer.noHistory', 'История переходов статуса отсутствует.')}
+              </p>
+            ) : (
+              <ol className="relative border-l border-border ml-2 space-y-4 text-xs">
+                {history.map((h) => {
+                  const toLabel =
+                    STATUS_OPTIONS.find((s) => s.id === h.to_status)?.label || h.to_status
+                  const fromLabel =
+                    STATUS_OPTIONS.find((s) => s.id === h.from_status)?.label || h.from_status
+                  return (
+                    <li key={h.id} className="ml-4 space-y-1">
+                      <div className="absolute -left-1.5 mt-1 size-3 rounded-full border border-background bg-ink" />
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="font-bold text-ink">
+                          {fromLabel ? `${fromLabel} → ` : ''}
+                          <span className="text-brand-deep font-extrabold">{toLabel}</span>
+                        </span>
+                        <span className="text-[10px] text-muted-foreground">
+                          {new Date(h.created_at).toLocaleString('ru-RU', {
+                            day: '2-digit',
+                            month: 'short',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </span>
                       </div>
-                      <time className="text-[10px] text-muted-foreground">
-                        {new Date(h.created_at).toLocaleString('ru-RU')}
-                      </time>
                       {h.note && (
-                        <p className="mt-0.5 text-ink/80 bg-muted/40 rounded-lg p-2 text-[11px]">
-                          {h.note}
+                        <p className="text-muted-foreground italic rounded-lg bg-muted/30 p-2">
+                          «{h.note}»
                         </p>
                       )}
                     </li>
-                  ))}
-                </ol>
-              ) : (
-                <p className="text-xs italic text-muted-foreground">
-                  {t('admin.drawer.noHistory', 'История изменений пока пуста')}
-                </p>
-              )}
-            </div>
+                  )
+                })}
+              </ol>
+            )}
           </div>
         </div>
       </div>

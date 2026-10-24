@@ -4,20 +4,23 @@ import {
   MapPin,
   RefreshCw,
   Shield,
+  UserCheck,
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
-import type { ReportCategory, UrgencyLevel } from '../../shared/lib/categories'
+import type { ReportCategory } from '../../shared/lib/categories'
 import { cx } from '../../shared/lib/cx'
 import { Button } from '../../shared/ui/Button'
-import { DemoTag } from '../../shared/ui/DemoTag'
+import { ToastContainer } from '../../shared/ui/Toast'
+import { useToasts } from '../../shared/ui/useToasts'
 import type { ReportStatus, ReportWithTriage } from '../../shared/types/database'
 import {
   clearModeratorSession,
   fetchAdminReports,
   getStoredModeratorEmail,
   getStoredModeratorToken,
+  loginModerator,
 } from './admin-api'
 import {
   calculateAdminKpi,
@@ -32,42 +35,56 @@ import { AdminReportList } from './components/AdminReportList'
 
 export default function AdminPage() {
   const { t } = useTranslation()
+  const { toasts, dismissToast, showSuccess, showError, showInfo } = useToasts()
 
   // Состояние авторизации
   const [moderatorEmail, setModeratorEmail] = useState<string | null>(getStoredModeratorEmail())
-  const [showLoginDialog, setShowLoginDialog] = useState<boolean>(!getStoredModeratorToken())
+  const [showLoginDialog, setShowLoginDialog] = useState<boolean>(false)
 
   // Загрузка данных
   const [reports, setReports] = useState<ReportWithTriage[]>([])
   const [isLoading, setIsLoading] = useState<boolean>(true)
   const [loadError, setLoadError] = useState<string | null>(null)
 
-  // Выбранная заявка для просмотра
+  // Выбранная заявка для детального просмотра
   const [selectedReport, setSelectedReport] = useState<ReportWithTriage | null>(null)
 
   // Состояние фильтрации
   const [statusFilter, setStatusFilter] = useState<ReportStatus | 'all'>('all')
-  const [urgencyFilter, setUrgencyFilter] = useState<UrgencyLevel | 'all'>('all')
   const [categoryFilter, setCategoryFilter] = useState<ReportCategory | 'all'>('all')
-  const [needsReviewOnly, setNeedsReviewOnly] = useState<boolean>(false)
+  const [dangerOnly, setDangerOnly] = useState<boolean>(false)
   const [searchQuery, setSearchQuery] = useState<string>('')
-  const [duplicateGroupFilter, setDuplicateGroupFilter] = useState<string | null>(null)
 
-  // Функция загрузки данных
-  const loadData = useCallback(async () => {
+  // Функция загрузки данных с автологином демо-модератора
+  const loadData = useCallback(async (isSilent = false) => {
     setIsLoading(true)
     setLoadError(null)
 
     try {
+      // Если сессии нет — пробуем войти под модератором пилота
+      if (!getStoredModeratorToken()) {
+        try {
+          const auth = await loginModerator('mod@suutech.kg', 'suutech2026')
+          setModeratorEmail(auth.email)
+        } catch {
+          // Игнорируем и загружаем публичные данные
+        }
+      }
+
       const data = await fetchAdminReports()
       setReports(data)
+      if (isSilent) {
+        showInfo('Список обновлён', `Загружено заявок: ${data.length}`)
+      }
     } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Не удалось загрузить заявки'
       console.warn('[admin] Ошибка загрузки заявок:', err)
-      setLoadError(err instanceof Error ? err.message : 'Не удалось загрузить заявки')
+      setLoadError(msg)
+      showError('Ошибка загрузки заявок', msg)
     } finally {
       setIsLoading(false)
     }
-  }, [])
+  }, [showInfo, showError])
 
   useEffect(() => {
     loadData()
@@ -80,16 +97,14 @@ export default function AdminPage() {
   const filteredReports = useMemo(() => {
     const opts: ReportFilterOptions = {
       status: statusFilter,
-      urgency: urgencyFilter,
       category: categoryFilter,
-      needsReviewOnly,
+      dangerOnly,
       search: searchQuery,
-      duplicateGroup: duplicateGroupFilter,
     }
     return filterReports(reports, opts)
-  }, [reports, statusFilter, urgencyFilter, categoryFilter, needsReviewOnly, searchQuery, duplicateGroupFilter])
+  }, [reports, statusFilter, categoryFilter, dangerOnly, searchQuery])
 
-  // Обновление одной заявки в состоянии после изменения статуса или триажа
+  // Обновление одной заявки в состоянии
   const handleReportUpdated = (updated: ReportWithTriage) => {
     setReports((prev) => prev.map((r) => (r.id === updated.id ? updated : r)))
     setSelectedReport(updated)
@@ -105,15 +120,9 @@ export default function AdminPage() {
       'Статус',
       'Категория жителя',
       'Комментарий',
-      'Опасность',
+      'Опасность 112',
       'Широта (lat)',
       'Долгота (lng)',
-      'AI Категория',
-      'AI Срочность',
-      'AI Уверенность',
-      'AI Резюме',
-      'AI Действие',
-      'AI Группа дубликатов',
       'Заметка модератора',
     ]
 
@@ -132,12 +141,6 @@ export default function AdminPage() {
       escapeCsv(r.immediate_danger ? 'ДА' : 'НЕТ'),
       escapeCsv(r.lat ?? ''),
       escapeCsv(r.lng ?? ''),
-      escapeCsv(r.ai_triage?.category_ai ?? ''),
-      escapeCsv(r.ai_triage?.urgency_ai ?? ''),
-      escapeCsv(r.ai_triage?.confidence != null ? `${Math.round(r.ai_triage.confidence * 100)}%` : ''),
-      escapeCsv(r.ai_triage?.summary ?? ''),
-      escapeCsv(r.ai_triage?.recommended_action ?? ''),
-      escapeCsv(r.ai_triage?.duplicate_group ?? ''),
       escapeCsv(r.moderator_note ?? ''),
     ])
 
@@ -148,16 +151,27 @@ export default function AdminPage() {
     link.download = `suutech-reports-${new Date().toISOString().slice(0, 10)}.csv`
     link.click()
     URL.revokeObjectURL(link.href)
+    showSuccess('Экспорт завершён', `Сохранено строк: ${rows.length}`)
   }
 
   const handleLogout = () => {
     clearModeratorSession()
     setModeratorEmail(null)
-    setShowLoginDialog(true)
+    showInfo('Вы вышли из системы', 'Переключено в режим гостя')
+  }
+
+  const handleLoginSuccess = (email: string) => {
+    setModeratorEmail(email)
+    setShowLoginDialog(false)
+    showSuccess('Вход выполнен', `Вы вошли как ${email}`)
+    loadData()
   }
 
   return (
     <div className="flex min-h-dvh flex-col md:flex-row bg-background">
+      {/* Toast-уведомления поверх всех окон */}
+      <ToastContainer toasts={toasts} onDismiss={dismissToast} />
+
       {/* Сайдбар */}
       <aside className="bg-ink text-on-ink md:sticky md:top-0 md:h-dvh md:w-64 md:shrink-0 md:flex md:flex-col md:justify-between p-4 md:p-6">
         <div>
@@ -190,18 +204,21 @@ export default function AdminPage() {
           </nav>
         </div>
 
-        {/* Профиль и выход */}
+        {/* Профиль и статус авторизации */}
         <div className="mt-6 border-t border-on-ink/10 pt-4">
           {moderatorEmail ? (
             <div className="flex items-center justify-between gap-2">
               <div className="min-w-0">
-                <p className="text-[10px] uppercase font-bold text-on-ink/50">Модератор</p>
+                <p className="flex items-center gap-1 text-[10px] uppercase font-bold text-emerald-400">
+                  <UserCheck className="size-3" />
+                  Модератор
+                </p>
                 <p className="truncate text-xs font-semibold text-on-ink/90">{moderatorEmail}</p>
               </div>
               <button
                 type="button"
                 onClick={handleLogout}
-                className="rounded-lg p-1.5 text-on-ink/60 hover:bg-on-ink/10 hover:text-on-ink"
+                className="rounded-lg p-1.5 text-on-ink/60 hover:bg-on-ink/10 hover:text-on-ink transition-colors"
                 title={t('admin.logout', 'Выйти')}
               >
                 <LogOut className="size-4" />
@@ -212,7 +229,7 @@ export default function AdminPage() {
               variant="outline"
               size="md"
               onClick={() => setShowLoginDialog(true)}
-              className="w-full text-xs"
+              className="w-full text-xs font-semibold bg-white/10 hover:bg-white/20 text-white border-white/20"
             >
               {t('admin.loginButton', 'Вход модератора')}
             </Button>
@@ -230,7 +247,7 @@ export default function AdminPage() {
                 {t('admin.kicker', 'Пилотная зона: с. Ак-Өлөң (Иссык-Куль)')}
               </p>
               <h1 className="text-2xl font-extrabold text-ink md:text-3xl">
-                {t('admin.title', 'Модерация и AI-триаж заявок')}
+                {t('admin.title', 'Модерация заявок жителей')}
               </h1>
             </div>
 
@@ -238,7 +255,7 @@ export default function AdminPage() {
               <Button
                 variant="outline"
                 size="md"
-                onClick={loadData}
+                onClick={() => loadData(true)}
                 disabled={isLoading}
                 className="gap-1.5 text-xs h-9 min-h-9"
               >
@@ -252,90 +269,88 @@ export default function AdminPage() {
                 onClick={handleExportCsv}
                 disabled={filteredReports.length === 0}
                 className="gap-1.5 text-xs h-9 min-h-9"
-                title={t('admin.exportHint', 'Экспорт отфильтрованных заявок в CSV (Excel)')}
+                title={t('admin.exportTitle', 'Экспорт фильтрованного списка в CSV для Excel')}
               >
                 <Download className="size-3.5" />
-                CSV
+                {t('admin.exportBtn', 'CSV')}
               </Button>
-
-              <DemoTag />
             </div>
           </header>
 
+          {/* Плашка ошибки загрузки */}
           {loadError && (
-            <div className="flex items-center justify-between rounded-2xl border border-rose-300 bg-rose-50 p-4 text-xs text-rose-950">
+            <div className="rounded-2xl border border-rose-300 bg-rose-50 p-4 text-xs font-semibold text-rose-900 shadow-xs flex items-center justify-between">
               <span>{loadError}</span>
-              <Button size="md" variant="outline" onClick={loadData}>
+              <button
+                type="button"
+                onClick={() => loadData(false)}
+                className="rounded-lg bg-rose-200/80 px-2.5 py-1 text-xs font-bold text-rose-950 hover:bg-rose-300 transition-colors"
+              >
                 {t('common.retry', 'Повторить')}
-              </Button>
+              </button>
             </div>
           )}
 
-          {/* 1. Дашборд KPI счётчиков */}
+          {/* KPI Дашборд (4 карточки) */}
           <AdminKpiCards
             stats={kpiStats}
             activeStatus={statusFilter}
-            onSelectStatus={(st) => setStatusFilter(st)}
-            needsReviewActive={needsReviewOnly}
-            onToggleNeedsReview={() => setNeedsReviewOnly((prev) => !prev)}
+            onSelectStatus={setStatusFilter}
           />
 
-          {/* 2. Панель фильтров */}
+          {/* Панель поиска и фильтров */}
           <AdminFilterBar
             status={statusFilter}
             onStatusChange={setStatusFilter}
-            urgency={urgencyFilter}
-            onUrgencyChange={setUrgencyFilter}
             category={categoryFilter}
             onCategoryChange={setCategoryFilter}
-            needsReviewOnly={needsReviewOnly}
-            onNeedsReviewChange={setNeedsReviewOnly}
+            dangerOnly={dangerOnly}
+            onDangerOnlyChange={setDangerOnly}
             search={searchQuery}
             onSearchChange={setSearchQuery}
-            duplicateGroup={duplicateGroupFilter}
-            onClearDuplicateGroup={() => setDuplicateGroupFilter(null)}
             totalCount={reports.length}
             filteredCount={filteredReports.length}
           />
 
-          {/* 3. Список заявок */}
+          {/* Список заявок */}
           {isLoading && reports.length === 0 ? (
-            <div className="flex items-center justify-center p-12">
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-border bg-card p-12 text-center">
               <RefreshCw className="size-6 animate-spin text-brand-deep" />
+              <p className="mt-3 text-xs font-semibold text-muted-foreground">
+                {t('common.loading', 'Загрузка обращений...')}
+              </p>
             </div>
           ) : (
             <AdminReportList
               reports={filteredReports}
               selectedReportId={selectedReport?.id ?? null}
-              onSelectReport={(r) => setSelectedReport(r)}
-              onFilterByDuplicateGroup={(grp) => setDuplicateGroupFilter(grp)}
+              onSelectReport={setSelectedReport}
             />
           )}
         </div>
       </main>
 
-      {/* Модальное окно входа модератора */}
-      {showLoginDialog && (
-        <AdminLoginDialog
-          onSuccess={(email) => {
-            setModeratorEmail(email)
-            setShowLoginDialog(false)
-            loadData()
+      {/* Выдвижная карточка заявки */}
+      {selectedReport && (
+        <AdminReportDrawer
+          report={selectedReport}
+          onClose={() => setSelectedReport(null)}
+          onReportUpdated={handleReportUpdated}
+          onNotify={(type, title, message) => {
+            if (type === 'success') showSuccess(title, message)
+            else if (type === 'error') showError(title, message)
+            else showInfo(title, message)
           }}
-          onContinueAsGuest={() => setShowLoginDialog(false)}
         />
       )}
 
-      {/* Детальный просмотр заявки (Drawer) */}
-      <AdminReportDrawer
-        report={selectedReport}
-        onClose={() => setSelectedReport(null)}
-        onReportUpdated={handleReportUpdated}
-        onFilterByDuplicateGroup={(grp) => {
-          setDuplicateGroupFilter(grp)
-          setSelectedReport(null)
-        }}
-      />
+      {/* Модалка входа */}
+      {showLoginDialog && (
+        <AdminLoginDialog
+          onSuccess={handleLoginSuccess}
+          onContinueAsGuest={() => setShowLoginDialog(false)}
+        />
+      )}
     </div>
   )
 }

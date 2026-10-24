@@ -1,28 +1,21 @@
-import { Filter, Search, X } from 'lucide-react'
+import { AlertTriangle, Search, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
   CATEGORY_LABELS_RU,
   REPORT_CATEGORIES,
-  URGENCY_LABELS_RU,
-  URGENCY_LEVELS,
   type ReportCategory,
-  type UrgencyLevel,
 } from '../../../shared/lib/categories'
 import type { ReportStatus } from '../../../shared/types/database'
 
 interface AdminFilterBarProps {
   status: ReportStatus | 'all'
   onStatusChange: (status: ReportStatus | 'all') => void
-  urgency: UrgencyLevel | 'all'
-  onUrgencyChange: (urgency: UrgencyLevel | 'all') => void
   category: ReportCategory | 'all'
   onCategoryChange: (category: ReportCategory | 'all') => void
-  needsReviewOnly: boolean
-  onNeedsReviewChange: (val: boolean) => void
+  dangerOnly: boolean
+  onDangerOnlyChange: (val: boolean) => void
   search: string
   onSearchChange: (search: string) => void
-  duplicateGroup: string | null
-  onClearDuplicateGroup: () => void
   totalCount: number
   filteredCount: number
 }
@@ -30,16 +23,12 @@ interface AdminFilterBarProps {
 export function AdminFilterBar({
   status,
   onStatusChange,
-  urgency,
-  onUrgencyChange,
   category,
   onCategoryChange,
-  needsReviewOnly,
-  onNeedsReviewChange,
+  dangerOnly,
+  onDangerOnlyChange,
   search,
   onSearchChange,
-  duplicateGroup,
-  onClearDuplicateGroup,
   totalCount,
   filteredCount,
 }: AdminFilterBarProps) {
@@ -47,19 +36,15 @@ export function AdminFilterBar({
 
   const hasActiveFilters =
     status !== 'all' ||
-    urgency !== 'all' ||
     category !== 'all' ||
-    needsReviewOnly ||
-    Boolean(search) ||
-    Boolean(duplicateGroup)
+    dangerOnly ||
+    Boolean(search)
 
   const handleResetFilters = () => {
     onStatusChange('all')
-    onUrgencyChange('all')
     onCategoryChange('all')
-    onNeedsReviewChange(false)
+    onDangerOnlyChange(false)
     onSearchChange('')
-    onClearDuplicateGroup()
   }
 
   return (
@@ -72,7 +57,7 @@ export function AdminFilterBar({
             type="text"
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
-            placeholder={t('admin.filters.searchPlaceholder', 'Поиск по комментарию, резюме или ID...')}
+            placeholder={t('admin.filters.searchPlaceholder', 'Поиск по комментарию или ID...')}
             className="w-full rounded-xl border border-border bg-background py-2 pr-4 pl-9 text-sm text-ink placeholder:text-muted-foreground focus:border-brand-deep focus:outline-none focus:ring-1 focus:ring-brand-deep"
           />
           {search && (
@@ -105,7 +90,7 @@ export function AdminFilterBar({
       </div>
 
       {/* Селекторы */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
         {/* Фильтр по статусу */}
         <div>
           <label className="mb-1 block text-[11px] font-semibold uppercase text-muted-foreground">
@@ -123,25 +108,6 @@ export function AdminFilterBar({
             <option value="in_progress">{t('admin.status.in_progress', 'В работе')}</option>
             <option value="resolved">{t('admin.status.resolved', 'Решено')}</option>
             <option value="rejected">{t('admin.status.rejected', 'Отклонено')}</option>
-          </select>
-        </div>
-
-        {/* Фильтр по срочности */}
-        <div>
-          <label className="mb-1 block text-[11px] font-semibold uppercase text-muted-foreground">
-            {t('admin.filters.urgency', 'Срочность (AI)')}
-          </label>
-          <select
-            value={urgency}
-            onChange={(e) => onUrgencyChange(e.target.value as UrgencyLevel | 'all')}
-            className="w-full rounded-xl border border-border bg-background px-3 py-1.5 text-xs font-medium text-ink focus:border-brand-deep focus:outline-none"
-          >
-            <option value="all">{t('admin.filters.allUrgencies', 'Все приоритеты')}</option>
-            {URGENCY_LEVELS.map((u) => (
-              <option key={u} value={u}>
-                {t(`categories.urgency.${u}`, URGENCY_LABELS_RU[u])}
-              </option>
-            ))}
           </select>
         </div>
 
@@ -164,37 +130,22 @@ export function AdminFilterBar({
           </select>
         </div>
 
-        {/* Чекбокс Проверка человеком */}
+        {/* Чекбокс Только с опасностью (112) */}
         <div className="flex items-end">
           <label className="flex h-8 w-full cursor-pointer items-center gap-2 rounded-xl border border-border bg-background px-3 text-xs font-medium text-ink select-none hover:bg-muted/40">
             <input
               type="checkbox"
-              checked={needsReviewOnly}
-              onChange={(e) => onNeedsReviewChange(e.target.checked)}
-              className="size-3.5 accent-purple-600"
+              checked={dangerOnly}
+              onChange={(e) => onDangerOnlyChange(e.target.checked)}
+              className="size-3.5 accent-rose-600"
             />
-            <span className="truncate">{t('admin.filters.needsReviewOnly', 'Требует проверки')}</span>
+            <span className="flex items-center gap-1 truncate text-rose-700 font-semibold">
+              <AlertTriangle className="size-3 shrink-0" />
+              {t('admin.filters.dangerOnly', 'Только с угрозой (112)')}
+            </span>
           </label>
         </div>
       </div>
-
-      {/* Плашка активной группы дубликатов */}
-      {duplicateGroup && (
-        <div className="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-900">
-          <span className="flex items-center gap-1.5 font-medium">
-            <Filter className="size-3.5" />
-            {t('admin.filters.activeGroup', 'Фильтр по группе дубликатов:')} <strong>{duplicateGroup}</strong>
-          </span>
-          <button
-            type="button"
-            onClick={onClearDuplicateGroup}
-            className="rounded p-0.5 hover:bg-amber-100"
-            title={t('admin.filters.clearGroup', 'Очистить фильтр группы')}
-          >
-            <X className="size-3.5" />
-          </button>
-        </div>
-      )}
     </div>
   )
 }
