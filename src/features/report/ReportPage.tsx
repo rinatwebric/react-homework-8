@@ -13,6 +13,7 @@ import { ScreenHeader } from '../../shared/ui/ScreenHeader'
 import { readReportContext } from '../../shared/types/report-context'
 import type { WeatherSnapshot } from '../../shared/types/report-contract'
 import { useWeather } from '../weather/hooks/useWeather'
+import { fetchWeatherCurrent, getCachedWeather } from '../weather/lib/weather-api'
 import { CategoryPicker } from './components/CategoryPicker'
 import { CommentField } from './components/CommentField'
 import { RiskLevelSelector, type ResidentRiskSeverity } from './components/RiskLevelSelector'
@@ -59,10 +60,13 @@ export function ReportPage() {
   const [errorCode, setErrorCode] = useState<SubmitReportErrorCode | null>(null)
   const { enqueue } = useOfflineQueue()
 
-  // Получаем погоду для текущей точки (Срез 3, §10)
+  // Погода для текущей точки
+  const targetLat = geo.point?.lat ?? PILOT_ZONE.center.lat
+  const targetLng = geo.point?.lng ?? PILOT_ZONE.center.lng
+
   const { weather } = useWeather({
-    lat: geo.point?.lat,
-    lng: geo.point?.lng,
+    lat: targetLat,
+    lng: targetLng,
   })
 
   const weatherSnapshot: WeatherSnapshot | null = useMemo(() => {
@@ -117,7 +121,43 @@ export function ReportPage() {
 
   const handleSubmit = useCallback(async () => {
     if (!deviceHash) return
-    const built = buildSubmitPayload(draft)
+
+    // Если weather еще не успел подгрузиться из хука — пробуем получить свежий или кэшированный снимок погоды
+    let finalWeatherSnapshot = weatherSnapshot
+    if (!finalWeatherSnapshot) {
+      try {
+        const cur = await fetchWeatherCurrent(targetLat, targetLng) || getCachedWeather()
+        if (cur && cur.temp_c != null) {
+          finalWeatherSnapshot = {
+            captured_at: new Date().toISOString(),
+            temperature_c: cur.temp_c,
+            precipitation_mm: cur.precip_mm ?? 0,
+            humidity_pct: cur.humidity ?? 50,
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    // Добавляем префикс выбранного риска в комментарий для модераторов
+    const riskPrefix =
+      riskSeverity === 'critical'
+        ? '[Критический риск / ЧС]'
+        : riskSeverity === 'elevated'
+          ? '[Высокий риск]'
+          : '[Умеренный риск]'
+
+    const rawComment = comment.trim()
+    const fullComment = rawComment ? `${riskPrefix} ${rawComment}` : riskPrefix
+
+    const payloadDraft = {
+      ...draft,
+      comment: fullComment,
+      weatherSnapshot: finalWeatherSnapshot ?? draft.weatherSnapshot,
+    }
+
+    const built = buildSubmitPayload(payloadDraft)
     if (!built.ok) {
       setErrorCode(null)
       return
@@ -167,7 +207,7 @@ export function ReportPage() {
     } finally {
       setSubmitting(false)
     }
-  }, [deviceHash, draft, enqueue])
+  }, [comment, deviceHash, draft, enqueue, riskSeverity, targetLat, targetLng, weatherSnapshot])
 
   if (sent) {
     return (
