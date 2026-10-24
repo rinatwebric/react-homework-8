@@ -56,20 +56,55 @@ export async function loginModerator(email: string, password: string): Promise<{
       apikey: supabaseConfig.anonKey,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email: email.trim(), password: password.trim() }),
   })
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({})) as { error_description?: string; msg?: string }
+    const errorData = (await response.json().catch(() => ({}))) as { error_description?: string; msg?: string }
     throw new Error(errorData.error_description || errorData.msg || `Ошибка входа: ${response.status}`)
   }
 
-  const data = await response.json() as { access_token: string; user?: { email?: string } }
+  const data = (await response.json()) as { access_token: string; user?: { email?: string } }
   const token = data.access_token
   const userEmail = data.user?.email ?? email
 
   storeModeratorSession(token, userEmail)
   return { token, email: userEmail }
+}
+
+/** Фолбек на публичное представление для режима гостя/просмотра */
+async function fetchPublicReportsFallback(): Promise<ReportWithTriage[]> {
+  if (!supabaseConfig) return []
+
+  const url = `${supabaseConfig.url.replace(/\/+$/, '')}/rest/v1/reports_public?order=created_at.desc`
+  const res = await fetch(url, {
+    headers: {
+      apikey: supabaseConfig.anonKey,
+      Authorization: `Bearer ${supabaseConfig.anonKey}`,
+      Accept: 'application/json',
+    },
+  })
+
+  if (!res.ok) {
+    throw new Error(`Ошибка загрузки заявок: ${res.status}`)
+  }
+
+  const data = (await res.json()) as unknown[]
+  return data.map((item) => {
+    const r = item as Record<string, unknown>
+    return {
+      ...r,
+      client_id: (r.id as string) || '',
+      lat: (r.lat_public as number) ?? null,
+      lng: (r.lng_public as number) ?? null,
+      location_adjusted_m: null,
+      created_by: null,
+      moderator_note: null,
+      device_hash: null,
+      ip_hash: null,
+      ai_triage: null,
+    } as ReportWithTriage
+  })
 }
 
 /** Загрузка заявок со связанным AI-триажем */
@@ -78,7 +113,14 @@ export async function fetchAdminReports(token?: string | null): Promise<ReportWi
     throw new Error('Supabase не настроен')
   }
 
-  const effectiveToken = token || getStoredModeratorToken() || supabaseConfig.anonKey
+  const storedToken = getStoredModeratorToken()
+  const effectiveToken = token || storedToken
+
+  // Если токена нет — загружаем публичные данные без ошибки
+  if (!effectiveToken) {
+    return fetchPublicReportsFallback()
+  }
+
   const url = `${supabaseConfig.url.replace(/\/+$/, '')}/rest/v1/reports?select=*,ai_triage(*)&order=created_at.desc`
 
   const response = await fetch(url, {
@@ -90,9 +132,10 @@ export async function fetchAdminReports(token?: string | null): Promise<ReportWi
   })
 
   if (!response.ok) {
-    // Если сессия протухла — сбрасываем токен
+    // Если сессия недействительна (401/403) — сбрасываем и загружаем публичные
     if (response.status === 401 || response.status === 403) {
       clearModeratorSession()
+      return fetchPublicReportsFallback()
     }
     throw new Error(`Ошибка загрузки заявок: ${response.status}`)
   }
@@ -101,7 +144,6 @@ export async function fetchAdminReports(token?: string | null): Promise<ReportWi
 
   return data.map((item) => {
     const record = item as Record<string, unknown>
-    // ai_triage в PostgREST возвращается либо как объект, либо как массив [0]
     let triageObj = record.ai_triage
     if (Array.isArray(triageObj)) {
       triageObj = triageObj[0] ?? null
@@ -199,10 +241,10 @@ export async function triggerAiTriage(
   })
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({})) as { message?: string }
+    const errorData = (await response.json().catch(() => ({}))) as { message?: string }
     throw new Error(errorData.message || `Ошибка запуска AI-триажа: ${response.status}`)
   }
 
-  const data = await response.json() as { triage: TriageResult }
+  const data = (await response.json()) as { triage: TriageResult }
   return data.triage
 }

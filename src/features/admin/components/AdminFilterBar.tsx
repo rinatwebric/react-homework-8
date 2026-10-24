@@ -1,7 +1,9 @@
 import { Filter, Search, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
+  CATEGORY_LABELS_RU,
   REPORT_CATEGORIES,
+  URGENCY_LABELS_RU,
   URGENCY_LEVELS,
   type ReportCategory,
   type UrgencyLevel,
@@ -115,12 +117,12 @@ export function AdminFilterBar({
             className="w-full rounded-xl border border-border bg-background px-3 py-1.5 text-xs font-medium text-ink focus:border-brand-deep focus:outline-none"
           >
             <option value="all">{t('admin.filters.allStatuses', 'Все статусы')}</option>
-            <option value="new">{t('admin.status.new', 'Новая (new)')}</option>
-            <option value="triaged">{t('admin.status.triaged', 'На проверке (triaged)')}</option>
-            <option value="assigned">{t('admin.status.assigned', 'Назначена (assigned)')}</option>
-            <option value="in_progress">{t('admin.status.in_progress', 'В работе (in_progress)')}</option>
-            <option value="resolved">{t('admin.status.resolved', 'Решено (resolved)')}</option>
-            <option value="rejected">{t('admin.status.rejected', 'Отклонено (rejected)')}</option>
+            <option value="new">{t('admin.status.new', 'Новая')}</option>
+            <option value="triaged">{t('admin.status.triaged', 'На проверке')}</option>
+            <option value="assigned">{t('admin.status.assigned', 'Назначена')}</option>
+            <option value="in_progress">{t('admin.status.in_progress', 'В работе')}</option>
+            <option value="resolved">{t('admin.status.resolved', 'Решено')}</option>
+            <option value="rejected">{t('admin.status.rejected', 'Отклонено')}</option>
           </select>
         </div>
 
@@ -137,7 +139,7 @@ export function AdminFilterBar({
             <option value="all">{t('admin.filters.allUrgencies', 'Все приоритеты')}</option>
             {URGENCY_LEVELS.map((u) => (
               <option key={u} value={u}>
-                {t(`categories.urgency.${u}`, u)}
+                {t(`categories.urgency.${u}`, URGENCY_LABELS_RU[u])}
               </option>
             ))}
           </select>
@@ -156,7 +158,7 @@ export function AdminFilterBar({
             <option value="all">{t('admin.filters.allCategories', 'Все категории')}</option>
             {REPORT_CATEGORIES.map((c) => (
               <option key={c} value={c}>
-                {t(`categories.items.${c}.title`, c)}
+                {t(`categories.items.${c}.title`, CATEGORY_LABELS_RU[c])}
               </option>
             ))}
           </select>

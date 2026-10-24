@@ -16,7 +16,9 @@ import {
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
+  CATEGORY_LABELS_RU,
   CATEGORY_META,
+  URGENCY_LABELS_RU,
   URGENCY_META,
   type UrgencyLevel,
 } from '../../../shared/lib/categories'
@@ -159,15 +161,15 @@ export function AdminReportDrawer({
   }
 
   const categoryTitle = report.category_user
-    ? t(`categories.items.${report.category_user}.title`, { defaultValue: report.category_user })
+    ? t(`categories.items.${report.category_user}.title`, { defaultValue: CATEGORY_LABELS_RU[report.category_user] })
     : t('admin.list.noCategory', 'Категория не указана')
 
   const triageCategoryTitle = report.ai_triage?.category_ai
-    ? t(`categories.items.${report.ai_triage.category_ai}.title`, { defaultValue: report.ai_triage.category_ai })
+    ? t(`categories.items.${report.ai_triage.category_ai}.title`, { defaultValue: CATEGORY_LABELS_RU[report.ai_triage.category_ai] })
     : '—'
 
   const triageUrgencyTitle = report.ai_triage?.urgency_ai
-    ? t(`categories.urgency.${report.ai_triage.urgency_ai}`, { defaultValue: report.ai_triage.urgency_ai })
+    ? t(`categories.urgency.${report.ai_triage.urgency_ai}`, { defaultValue: URGENCY_LABELS_RU[report.ai_triage.urgency_ai as UrgencyLevel] })
     : '—'
 
   return (

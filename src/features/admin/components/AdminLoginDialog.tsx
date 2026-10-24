@@ -1,9 +1,9 @@
-import { Lock, Shield, User } from 'lucide-react'
+import { Info, Lock, Shield, User } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../../../shared/ui/Button'
 import { Card } from '../../../shared/ui/Card'
-import { loginModerator, storeModeratorSession } from '../admin-api'
+import { loginModerator } from '../admin-api'
 
 interface AdminLoginDialogProps {
   onSuccess: (email: string) => void
@@ -12,8 +12,8 @@ interface AdminLoginDialogProps {
 
 export function AdminLoginDialog({ onSuccess, onContinueAsGuest }: AdminLoginDialogProps) {
   const { t } = useTranslation()
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
+  const [email, setEmail] = useState('mod@suutech.kg')
+  const [password, setPassword] = useState('suutech2026')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -26,17 +26,23 @@ export function AdminLoginDialog({ onSuccess, onContinueAsGuest }: AdminLoginDia
       const res = await loginModerator(email, password)
       onSuccess(res.email)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Ошибка авторизации')
+      setError(err instanceof Error ? err.message : 'Неверный email или пароль')
     } finally {
       setIsLoading(false)
     }
   }
 
-  const handleDemoLogin = () => {
-    // Демо-вход для жюри и ревью хакатона
-    const demoEmail = 'moderator@suutech.kg'
-    storeModeratorSession('demo_moderator_token', demoEmail)
-    onSuccess(demoEmail)
+  const handleDemoLogin = async () => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const res = await loginModerator('mod@suutech.kg', 'suutech2026')
+      onSuccess(res.email)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Ошибка демо-входа')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -62,7 +68,18 @@ export function AdminLoginDialog({ onSuccess, onContinueAsGuest }: AdminLoginDia
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="mt-5 space-y-3">
+        {/* Подсказка с логином и паролем для жюри */}
+        <div className="mt-4 flex items-start gap-2 rounded-xl border border-blue-200 bg-blue-50/70 p-3 text-xs text-blue-900">
+          <Info className="size-4 shrink-0 text-blue-600 mt-0.5" />
+          <div>
+            <p className="font-semibold">Данные для входа жюри:</p>
+            <p className="mt-0.5 font-mono text-[11px] text-blue-800">
+              Email: <strong>mod@suutech.kg</strong> / Пароль: <strong>suutech2026</strong>
+            </p>
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} className="mt-4 space-y-3">
           <div>
             <label className="block text-xs font-semibold text-ink mb-1">Email</label>
             <div className="relative">
@@ -102,10 +119,11 @@ export function AdminLoginDialog({ onSuccess, onContinueAsGuest }: AdminLoginDia
           <Button
             type="button"
             variant="outline"
+            disabled={isLoading}
             onClick={handleDemoLogin}
             className="w-full text-xs font-semibold"
           >
-            {t('admin.login.demoButton', 'Войти как дежурный модератор (демо для жюри)')}
+            {t('admin.login.demoButton', 'Быстрый вход для жюри (1 клик)')}
           </Button>
 
           <button

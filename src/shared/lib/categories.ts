@@ -35,6 +35,16 @@ export const REPORT_CATEGORIES = [
 
 export type ReportCategory = (typeof REPORT_CATEGORIES)[number]
 
+export const CATEGORY_LABELS_RU: Record<ReportCategory, string> = {
+  basement_water: 'Вода в подвале',
+  damp_wall: 'Сырость на стенах',
+  standing_water: 'Стоячая вода',
+  drainage_issue: 'Водоотвод / арык',
+  well_level: 'Уровень в колодце',
+  road_flooding: 'Затопление дороги',
+  other: 'Другое',
+}
+
 type CategoryMeta = {
   icon: LucideIcon
   /** Цвет метки на карте (Leaflet): насыщенный, чтобы читался поверх заливки зон. */
@@ -101,6 +111,13 @@ export function categoryMeta(category: ReportCategory | null): CategoryMeta | nu
  */
 export const URGENCY_LEVELS = ['low', 'medium', 'high', 'critical'] as const
 export type UrgencyLevel = (typeof URGENCY_LEVELS)[number]
+
+export const URGENCY_LABELS_RU: Record<UrgencyLevel, string> = {
+  critical: 'Критическая',
+  high: 'Высокая',
+  medium: 'Средняя',
+  low: 'Низкая',
+}
 
 type UrgencyMeta = {
   /** Порядок в очереди модератора: critical первым. */

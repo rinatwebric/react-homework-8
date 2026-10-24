@@ -7,7 +7,9 @@ import {
 } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import {
+  CATEGORY_LABELS_RU,
   CATEGORY_META,
+  URGENCY_LABELS_RU,
   URGENCY_META,
   type UrgencyLevel,
 } from '../../../shared/lib/categories'
@@ -71,8 +73,14 @@ export function AdminReportList({
         })
 
         const categoryTitle = report.category_user
-          ? t(`categories.items.${report.category_user}.title`, { defaultValue: report.category_user })
+          ? t(`categories.items.${report.category_user}.title`, { defaultValue: CATEGORY_LABELS_RU[report.category_user] })
           : t('admin.list.noCategory', 'Без категории')
+
+        const urgencyLabel = report.ai_triage?.urgency_ai
+          ? t(`categories.urgency.${report.ai_triage.urgency_ai}`, {
+              defaultValue: URGENCY_LABELS_RU[report.ai_triage.urgency_ai as UrgencyLevel] || report.ai_triage.urgency_ai,
+            })
+          : null
 
         return (
           <div
@@ -168,14 +176,14 @@ export function AdminReportList({
             <div className="mt-1 flex flex-wrap items-center justify-between gap-2 border-t border-border/50 pt-2 text-xs">
               <div className="flex flex-wrap items-center gap-1.5">
                 {/* Бейдж AI-срочности */}
-                {urgencyMeta && report.ai_triage?.urgency_ai && (
+                {urgencyMeta && urgencyLabel && (
                   <span
                     className={cx(
                       'rounded-md border px-1.5 py-0.5 text-[11px] font-bold',
                       urgencyMeta.badge,
                     )}
                   >
-                    {t(`categories.urgency.${report.ai_triage.urgency_ai}`, { defaultValue: report.ai_triage.urgency_ai })}
+                    {urgencyLabel}
                   </span>
                 )}
 

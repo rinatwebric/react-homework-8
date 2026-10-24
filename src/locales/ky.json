@@ -122,5 +122,39 @@
       "demoButton": "Кезектеги модератор катары кирүү (жюри үчүн демо)",
       "guestMode": "Көрүү режиминде улантуу (окуу үчүн гана)"
     }
+  },
+  "report": {
+    "optional": "Милдеттүү эмес"
+  },
+  "categories": {
+    "items": {
+      "basement_water": {
+        "title": "Төлөөдөгү суу"
+      },
+      "damp_wall": {
+        "title": "Дубалдын нымдуулугу"
+      },
+      "standing_water": {
+        "title": "Токтоп турган суу"
+      },
+      "drainage_issue": {
+        "title": "Арык / суу түтүгү"
+      },
+      "well_level": {
+        "title": "Кудуктун деңгээли"
+      },
+      "road_flooding": {
+        "title": "Жолду суу каптоо"
+      },
+      "other": {
+        "title": "Башка"
+      }
+    },
+    "urgency": {
+      "critical": "Өтө шашылыш",
+      "high": "Жогорку",
+      "medium": "Орточо",
+      "low": "Төмөн"
+    }
   }
 }
