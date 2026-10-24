@@ -11,7 +11,8 @@ description: SuuTech Supabase backend (v2.0) - additive migrations, reports v2 s
 ## Правила работы
 - Схема меняется **только миграциями** (`npx supabase migration new <name>`), вручную в Dashboard — никогда.
 - **Миграции аддитивные** до конца демо: `add column if not exists`, `create table if not exists`,
-  `drop constraint if exists` перед `add constraint`. Никаких `drop column`/`drop table` без отдельного PR.
+  `drop constraint if exists` перед `add constraint`. `drop column`/`drop table` — только отдельным PR
+  очистки v1.0 (пример: `20261025120000_drop_photo_assessments.sql`), с `if exists` и после согласования.
 - Локальная проверка без Docker: `npm run verify:sql` (PGlite применяет все миграции и проверяет RLS, права, CHECK).
   Скрипт `scripts/verify-migration.mjs` расширяется вместе со схемой: новый инвариант = новая проверка.
 - Прод: Management API `POST /v1/projects/{ref}/database/query`, затем строка в `supabase_migrations.schema_migrations`.
@@ -26,7 +27,9 @@ description: SuuTech Supabase backend (v2.0) - additive migrations, reports v2 s
   **`immediate_danger boolean default false`**, **`weather_snapshot jsonb`**, `status`, `moderator_note`,
   `created_by`, `device_hash`, `ip_hash`, `photo_sha256`, `is_demo`.
   Поля v1.0 (`risk_level`, `confidence`, `findings`, `recommendations`, `water_in_basement`, `well_depth_m`, `mode`)
-  пока живут рядом — их удаляет PR-5, когда фронт переедет на категории.
+  пока живут рядом — их удаляет остаток PR-5, когда фронт переедет на категории.
+- Таблицы v1.0 в схеме больше нет: `photo_assessments` (кэш удалённой Edge Function `analyze-photo`)
+  удалена миграцией `20261025120000`; новый код на неё не ссылается и восстанавливать её не нужно.
 - `ai_triage` (1:1 к заявке): `report_id pk`, `category_ai`, `urgency_ai`, `summary`, `recommended_action`,
   `duplicate_group`, `confidence`, `needs_human_review`, `model`, `created_at`. Наружу не отдаётся.
 - `report_status_history`: `id identity`, `report_id`, `from_status`, `to_status`, `note`, `changed_by`, `created_at`.

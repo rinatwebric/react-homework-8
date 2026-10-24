@@ -37,8 +37,9 @@ SuuTech — мобильное PWA, где житель за секунды от
   `vite-plugin-pwa` (`injectManifest`, свой `src/sw.ts`), `react-leaflet` + `react-leaflet-cluster`,
   `idb`, `i18next`/`react-i18next`, `zod`, `browser-image-compression`.
 - Backend: Supabase — Postgres + RLS, Auth (только модераторы), Storage, Edge Functions (Deno).
-- Функции v2.0: `submit-report`, `classify-report`, `weather-current`, `send-alert`. Легаси `analyze-photo`
-  удаляется вместе с AI-сканером.
+- Функции v2.0: `submit-report` (в проде), далее `classify-report`, `weather-current`, `send-alert`.
+  Легаси `analyze-photo` удалён вместе с AI-сканером (PR-5, 2026-10-25) — фото осталось
+  необязательным вложением заявки, отдельного сканера у жителя нет.
 - Внешнее: Open-Meteo (без ключа), тайлы OSM, vision/LLM — ключ только в секретах функций,
   границы областей/районов — geoBoundaries (ODbL / CC BY-SA, нужна атрибуция).
 - Деплой: Vercel (frontend), Supabase Cloud (backend). Линтер: oxlint.
