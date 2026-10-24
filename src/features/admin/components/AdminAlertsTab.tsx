@@ -1,6 +1,7 @@
 import {
   AlertOctagon,
   AlertTriangle,
+  BellRing,
   Info,
   RefreshCw,
   Send,
@@ -13,6 +14,7 @@ import { Button } from '../../../shared/ui/Button'
 import { Card } from '../../../shared/ui/Card'
 import { cx } from '../../../shared/lib/cx'
 import { getStoredModeratorToken, loginModerator } from '../admin-api'
+import { showSystemNotification } from '../../home/lib/notification-service'
 
 type AdminAlertsTabProps = {
   onNotify: (type: 'success' | 'error' | 'info', title: string, message?: string) => void
@@ -30,6 +32,38 @@ export function AdminAlertsTab({ onNotify }: AdminAlertsTabProps) {
   // История алертов
   const [alerts, setAlerts] = useState<AlertItem[]>([])
   const [isLoading, setIsLoading] = useState<boolean>(true)
+  const [isTestingPush, setIsTestingPush] = useState<boolean>(false)
+
+  const handleSendTestPush = async () => {
+    setIsTestingPush(true)
+    try {
+      if (typeof window !== 'undefined' && 'Notification' in window) {
+        if (Notification.permission !== 'granted') {
+          const perm = await Notification.requestPermission()
+          if (perm !== 'granted') {
+            onNotify('error', t('admin.alerts.pushPermissionDenied', 'Разрешение на уведомления отклонено в браузере'))
+            return
+          }
+        }
+
+        const sent = await showSystemNotification('⚠️ SuuTech ТЕСТ: Угроза подтопления', {
+          body: 'Учебная тревога: подъем уровня грунтовых вод в селе Ак-Өлөң. Проверьте подвалы.',
+          tag: `test-push-${Date.now()}`,
+          data: { url: '/' },
+        })
+
+        if (sent) {
+          onNotify('success', t('admin.alerts.testPushSent', 'Тестовое уведомление доставлено на устройство'))
+        } else {
+          onNotify('error', t('admin.alerts.testPushFailed', 'Не удалось отобразить уведомление (проверьте настройки PWA)'))
+        }
+      } else {
+        onNotify('error', t('admin.alerts.pushNotSupported', 'Push-уведомления не поддерживаются в этом браузере'))
+      }
+    } finally {
+      setIsTestingPush(false)
+    }
+  }
 
   const loadAlerts = useCallback(async () => {
     setIsLoading(true)
@@ -77,6 +111,12 @@ export function AdminAlertsTab({ onNotify }: AdminAlertsTabProps) {
       )
       setMessage('')
       await loadAlerts()
+
+      // Также пытаемся отправить локальное мобильное уведомление на текущем устройстве
+      await showSystemNotification(`SuuTech: ${t(`alerts.levels.${level}`)}`, {
+        body: `${created.area ? `[${created.area}] ` : ''}${created.message}`,
+        tag: created.id,
+      })
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       onNotify('error', t('admin.alerts.sendError', 'Не удалось отправить предупреждение'), msg)
@@ -186,7 +226,19 @@ export function AdminAlertsTab({ onNotify }: AdminAlertsTabProps) {
             />
           </div>
 
-          <div className="flex justify-end pt-1">
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+            <Button
+              type="button"
+              variant="outline"
+              size="md"
+              onClick={handleSendTestPush}
+              disabled={isTestingPush}
+              className="gap-2 text-xs"
+            >
+              <BellRing className={cx('size-4 text-amber-500', isTestingPush && 'animate-spin')} />
+              {t('admin.alerts.sendTestPushBtn', 'Отправить тестовое push-уведомление')}
+            </Button>
+
             <Button
               type="submit"
               size="md"
