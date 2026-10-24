@@ -50,7 +50,7 @@ export const MAP_VIEW: {
     [43.3, 80.4],
   ],
   minZoom: 5,
-  maxZoom: 14,
+  maxZoom: 18,
 }
 
 /** Hex-копии токенов --color-risk-*-fill: заливка зон и цвет метки. */

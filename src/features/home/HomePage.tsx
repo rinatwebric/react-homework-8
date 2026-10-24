@@ -19,6 +19,7 @@ import {
   markAlertsAsSeen,
   notifyNewAlerts,
 } from './lib/notification-service'
+import { getCachedLocationName, reverseGeocodeVillage } from './lib/user-village'
 import { RainWarningBanner } from '../weather/components/RainWarningBanner'
 import { useWeather } from '../weather/hooks/useWeather'
 
@@ -33,6 +34,29 @@ export function HomePage() {
   const [alertsOpen, setAlertsOpen] = useState(false)
   const [alerts, setAlerts] = useState<AlertItem[]>([])
   const [unreadCount, setUnreadCount] = useState<number>(0)
+  const [userLocation, setUserLocation] = useState<string>(() => {
+    const cached = getCachedLocationName()
+    return cached ? cached.villageOrCity : PILOT_ZONE.nameRu
+  })
+
+  // Определение фактического местоположения пользователя
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('geolocation' in navigator)) return
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords
+        void reverseGeocodeVillage(latitude, longitude).then((loc) => {
+          if (loc?.villageOrCity) {
+            setUserLocation(loc.villageOrCity)
+          }
+        })
+      },
+      () => {
+        // При отказе или ошибке GPS остается название пилота
+      },
+      { timeout: 8000, maximumAge: 60000 },
+    )
+  }, [])
 
   const { weather } = useWeather({
     lat: PILOT_ZONE.center.lat,
@@ -95,7 +119,7 @@ export function HomePage() {
         <div className="min-w-0">
           <p className="text-sm text-muted-foreground">{t('home.villageLabel')}</p>
           <h1 className="text-3xl leading-tight font-extrabold tracking-tight text-ink">
-            {PILOT_ZONE.nameRu}
+            {userLocation}
           </h1>
         </div>
         <button

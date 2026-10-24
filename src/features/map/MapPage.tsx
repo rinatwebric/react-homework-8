@@ -152,7 +152,6 @@ export default function MapPage() {
         <ButtonLink to="/report" className="w-full">
           {t('map.ctaReport')}
         </ButtonLink>
-        <p className="text-[11px] leading-snug text-muted-foreground">{t('map.demoNote')}</p>
       </div>
     </section>
   )
