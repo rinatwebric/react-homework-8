@@ -1,19 +1,26 @@
+import { z } from 'npm:zod@4.6.7'
+import { REPORT_CATEGORIES } from './categories.ts'
+import { distanceMeters } from './geo.ts'
+
 /**
- * Контракт Edge Function `submit-report` — серверная сторона.
+ * Контракт Edge Function `submit-report` — серверная сторона, v2.0 (ТЗ §7).
  *
  * ⚠️ Копия src/shared/types/report-contract.ts: Deno не может импортировать код
  * приложения. Меняя поля, правь оба файла (и миграцию, если меняются колонки).
  *
- * Правило честности: `risk_level`/`confidence` приходят только из AI-оценки фото
- * (`analyze-photo`), уровень зоны считают пороговые правила, а не эта функция.
+ * Правило честности v2: ни категория, ни срочность не «угадываются» здесь.
+ * `category` приходит от жителя, `urgency` появится только из AI-триажа и
+ * подтверждения модератора (§8). Уровень зоны считают пороговые правила.
  */
-import { z } from 'npm:zod@4.6.7'
 
 /** Версия контракта: несовпадение — 400 INVALID_INPUT, чтобы не писать мусор в БД. */
-export const REPORT_CONTRACT_VERSION = '1.0'
+export const REPORT_CONTRACT_VERSION = '2.0'
 
-/** Глубина колодца: 0…50 м. Совпадает с src/config/report.ts и check в БД. */
-export const WELL_DEPTH_MAX_M = 50
+/** Комментарий жителя: null или 1…500 символов (§7, CHECK в БД). */
+export const COMMENT_MAX_LENGTH = 500
+
+/** Метку можно сдвинуть не дальше 300 м от GPS (§7.2), дублирует CHECK в БД. */
+export const MAX_LOCATION_ADJUST_M = 300
 
 /** Стартовые лимиты частоты (калибруются на пилоте). */
 export const REPORTS_PER_DEVICE_PER_HOUR = 10
@@ -38,33 +45,60 @@ export function photoPathClientId(path: string): string | null {
   return match?.[1] ?? null
 }
 
+/** Точка на карте: широта/долгота в градусах. */
+export const mapPointSchema = z.object({
+  lat: z.number().min(-90).max(90),
+  lng: z.number().min(-180).max(180),
+})
+
+/** GPS-фикс: точка + точность в метрах. Без фикса заявку не отправить (§7.2). */
+export const gpsFixSchema = z.object({
+  lat: z.number().min(-90).max(90),
+  lng: z.number().min(-180).max(180),
+  accuracy_m: z.number().min(0).max(5_000),
+})
+
+/** Снимок погоды в момент заявки (§10): справочные данные Open-Meteo, может быть null. */
+export const weatherSnapshotSchema = z.object({
+  captured_at: z.iso.datetime(),
+  temperature_c: z.number().min(-60).max(60),
+  precipitation_mm: z.number().min(0).max(500),
+  humidity_pct: z.number().min(0).max(100),
+})
+
 export const submitReportRequestSchema = z
   .object({
     contract_version: z.literal(REPORT_CONTRACT_VERSION),
     client_id: z.uuid(),
     /** SHA-256 идентификатора устройства: сам UUID устройства сервер не видит. */
     device_hash: deviceHashSchema,
-    lat: z.number().min(-90).max(90),
-    lng: z.number().min(-180).max(180),
-    /** Точность GPS, метры. null — точка поставлена вручную (точность не измерена). */
-    accuracy_m: z.number().min(0).max(5_000).nullable(),
-    water_in_basement: z.boolean(),
-    well_depth_m: z.number().min(0).max(WELL_DEPTH_MAX_M).nullable(),
+    /** Категория от жителя: от неё зависит триаж, поэтому обязательна. */
+    category: z.enum(REPORT_CATEGORIES),
+    /** Комментарий: null или непустая строка до 500 символов. */
+    comment: z.string().trim().min(1).max(COMMENT_MAX_LENGTH).nullable(),
+    /** «Есть непосредственная опасность» — подсказка модератору, не замена 112 (§11). */
+    immediate_danger: z.boolean(),
+    /** Подтверждённая жителем метка (после перетаскивания). */
+    point: mapPointSchema,
+    /** Исходный GPS-фикс: сдвиг считает сервер, клиенту верить нельзя (§7.2). */
+    gps: gpsFixSchema,
     photo_path: photoPathSchema.nullable(),
-    risk_level: z.enum(['low', 'medium', 'high']).nullable(),
-    confidence: z.number().min(0).max(1).nullable(),
-    findings: z.array(z.string().trim().min(1).max(240)).max(6),
-    recommendations: z.array(z.string().trim().min(1).max(240)).max(5),
-    captured_at: z.iso.datetime().nullable(),
-    mode: z.enum(['resident', 'farmer']),
+    weather_snapshot: weatherSnapshotSchema.nullable(),
   })
   .superRefine((value, ctx) => {
-    if (value.photo_path === null) return
-    if (photoPathClientId(value.photo_path) !== value.client_id) {
+    if (value.photo_path !== null && photoPathClientId(value.photo_path) !== value.client_id) {
       ctx.addIssue({
         code: 'custom',
         path: ['photo_path'],
         message: 'Фото должно лежать в папке своего client_id',
+      })
+    }
+
+    if (distanceMeters(value.gps, value.point) > MAX_LOCATION_ADJUST_M) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['point'],
+        message: `Метка дальше ${MAX_LOCATION_ADJUST_M} м от геопозиции`,
       })
     }
   })

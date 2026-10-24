@@ -1,23 +1,26 @@
 /**
- * Edge Function `submit-report` — срез 2, PR-1.
+ * Edge Function `submit-report` — срез 2, PR-2 (контракт v2.0).
  *
  * Тело (JSON): SubmitReportRequest из _shared/report-schema.ts.
  * Ответ 200: { id, duplicate } — duplicate=true, если client_id уже был (повтор из очереди).
  *
  * Что делает функция:
- *  1) валидирует тело zod (включая «фото лежит в папке своего client_id»);
+ *  1) валидирует тело zod (фото в папке своего client_id, метка ≤ 300 м от GPS);
  *  2) проверяет лимит частоты по device_hash и по хэшу IP;
  *  3) идемпотентно пишет строку в public.reports под service role;
  *  4) возвращает id отчёта.
  *
- * Полные координаты и хэши видны только модераторам: anon читает view reports_public
- * (координаты округлены до ~100 м), INSERT у anon нет вовсе.
+ * Сдвиг метки сервер считает сам по исходному GPS-фиксу: клиентская проверка 300 м —
+ * удобство формы, а не защита (§7.2). Полные координаты и хэши видны только
+ * модераторам: anon читает view reports_public (координаты округлены до ~100 м),
+ * INSERT у anon нет вовсе.
  *
  * Секреты не нужны: SUPABASE_URL и SUPABASE_SERVICE_ROLE_KEY подставляет Edge Runtime.
  */
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2'
 import { jsonResponse, preflightResponse } from '../_shared/cors.ts'
 import { ApiError } from '../_shared/errors.ts'
+import { distanceMeters } from '../_shared/geo.ts'
 import {
   REPORTS_PER_DEVICE_PER_HOUR,
   REPORTS_PER_IP_PER_HOUR,
@@ -123,25 +126,25 @@ async function insertReport(
   payload: SubmitReportRequest,
   ipHash: string,
 ): Promise<InsertedReport & { duplicate: boolean }> {
+  // Сдвиг считаем сами: клиенту верить нельзя, а CHECK в БД ждёт число ≤ 300.
+  const adjustedM = distanceMeters(payload.gps, payload.point)
   const { data, error } = await client
     .from('reports')
     .upsert(
       {
         client_id: payload.client_id,
-        lat: payload.lat,
-        lng: payload.lng,
-        accuracy_m: payload.accuracy_m,
-        zone_id: zoneForPoint(payload.lat, payload.lng),
+        // В БД — подтверждённая метка; исходный GPS остаётся в сдвиге и точности.
+        lat: payload.point.lat,
+        lng: payload.point.lng,
+        accuracy_m: payload.gps.accuracy_m,
+        // 0,1 м достаточно: значение нужно модератору, а не для расчётов.
+        location_adjusted_m: Math.round(adjustedM * 10) / 10,
+        zone_id: zoneForPoint(payload.point.lat, payload.point.lng),
+        category_user: payload.category,
+        comment: payload.comment,
+        immediate_danger: payload.immediate_danger,
+        weather_snapshot: payload.weather_snapshot,
         photo_path: payload.photo_path,
-        risk_level: payload.risk_level,
-        confidence: payload.confidence,
-        findings: payload.findings,
-        // В контракте рекомендации — массив строк, в БД — jsonb: форма та же.
-        recommendations: payload.recommendations,
-        water_in_basement: payload.water_in_basement,
-        well_depth_m: payload.well_depth_m,
-        mode: payload.mode,
-        captured_at: payload.captured_at,
         device_hash: payload.device_hash,
         ip_hash: ipHash,
       },

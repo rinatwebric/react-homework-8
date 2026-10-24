@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
+import { MAX_LOCATION_ADJUST_M } from '../types/report-contract'
 import {
+  bearingDegrees,
+  clampPointToRadius,
+  destinationPoint,
   distanceMeters,
   formatAccuracy,
   roundForPublic,
@@ -50,5 +54,64 @@ describe('geo: подпись точности', () => {
 
   it('не показывает «±0 м» — минимум 1 м', () => {
     expect(formatAccuracy(0.2)).toBe('±1 м')
+  })
+})
+
+describe('geo: азимут и точка по лучу', () => {
+  it('на север и на восток — 0° и 90°', () => {
+    expect(bearingDegrees({ lat: 42.348, lng: 76.167 }, { lat: 42.358, lng: 76.167 })).toBeCloseTo(0, 1)
+    expect(bearingDegrees({ lat: 42.348, lng: 76.167 }, { lat: 42.348, lng: 76.177 })).toBeCloseTo(90, 1)
+  })
+
+  it('на юг и на запад — 180° и 270°', () => {
+    expect(bearingDegrees({ lat: 42.348, lng: 76.167 }, { lat: 42.338, lng: 76.167 })).toBeCloseTo(180, 1)
+    expect(bearingDegrees({ lat: 42.348, lng: 76.167 }, { lat: 42.348, lng: 76.157 })).toBeCloseTo(270, 1)
+  })
+
+  it('всегда в диапазоне 0…360', () => {
+    const bearing = bearingDegrees({ lat: 42.348, lng: 76.167 }, { lat: 42.3481, lng: 76.1671 })
+    expect(bearing).toBeGreaterThanOrEqual(0)
+    expect(bearing).toBeLessThan(360)
+  })
+
+  it('destinationPoint обратна distanceMeters', () => {
+    const origin = { lat: 42.348, lng: 76.167 }
+    const target = destinationPoint(origin, 45, 250)
+    expect(distanceMeters(origin, target)).toBeCloseTo(250, 0)
+    expect(bearingDegrees(origin, target)).toBeCloseTo(45, 0)
+  })
+
+  it('ноль метров — та же точка', () => {
+    const origin = { lat: 42.348, lng: 76.167 }
+    const same = destinationPoint(origin, 123, 0)
+    expect(distanceMeters(origin, same)).toBeCloseTo(0, 5)
+  })
+})
+
+describe('geo: радиус 300 м для метки заявки', () => {
+  const gps = { lat: 42.348, lng: 76.167 }
+
+  it('точка внутри радиуса остаётся как есть', () => {
+    const point = { lat: 42.3485, lng: 76.1675 }
+    expect(clampPointToRadius(gps, point, MAX_LOCATION_ADJUST_M)).toEqual(point)
+  })
+
+  it('точку за радиусом притягивает ровно к границе', () => {
+    const far = destinationPoint(gps, 90, 1_000)
+    const clamped = clampPointToRadius(gps, far, MAX_LOCATION_ADJUST_M)
+    expect(distanceMeters(gps, clamped)).toBeCloseTo(MAX_LOCATION_ADJUST_M, 0)
+    // Направление сохраняется: сдвиг по тому же лучу.
+    expect(bearingDegrees(gps, clamped)).toBeCloseTo(90, 0)
+  })
+
+  it('на самой границе точку не двигает', () => {
+    const edge = destinationPoint(gps, 200, MAX_LOCATION_ADJUST_M)
+    const clamped = clampPointToRadius(gps, edge, MAX_LOCATION_ADJUST_M)
+    expect(distanceMeters(gps, clamped)).toBeLessThanOrEqual(MAX_LOCATION_ADJUST_M + 0.001)
+  })
+
+  it('нечисловой радиус — возвращает исходную точку', () => {
+    const far = destinationPoint(gps, 10, 5_000)
+    expect(clampPointToRadius(gps, far, 0)).toEqual(gps)
   })
 })
