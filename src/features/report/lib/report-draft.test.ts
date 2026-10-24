@@ -118,7 +118,7 @@ describe('buildSubmitPayload: тело запроса v2.0', () => {
     expect(result.payload.immediate_danger).toBe(true)
   })
 
-  it('переносит путь фото из сканера', () => {
+  it('переносит путь фото, приложенного к заявке', () => {
     const result = buildSubmitPayload({
       ...draft,
       photoPath: '22222222-2222-4222-8222-222222222222/6f1d7a5e-0000-4000-8000-000000000000.jpg',

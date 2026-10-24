@@ -1,4 +1,4 @@
-import { ArrowRight, Bell, Droplet, MapPin, Plus, ScanLine } from 'lucide-react'
+import { ArrowRight, Bell, MapPin, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Link } from 'react-router-dom'
@@ -12,9 +12,7 @@ import { IconTile } from '../../shared/ui/IconTile'
 import { RiskScale } from '../../shared/ui/RiskScale'
 
 const TILES = [
-  { to: '/scan', icon: ScanLine, titleKey: 'home.tiles.scanTitle', textKey: 'home.tiles.scanText' },
   { to: '/map', icon: MapPin, titleKey: 'home.tiles.mapTitle', textKey: 'home.tiles.mapText' },
-  { to: '/water', icon: Droplet, titleKey: 'home.tiles.waterTitle', textKey: 'home.tiles.waterText' },
   { to: '/report', icon: Plus, titleKey: 'home.tiles.reportTitle', textKey: 'home.tiles.reportText' },
 ] as const
 
@@ -50,8 +48,8 @@ export function HomePage() {
         <p className="text-4xl font-extrabold tracking-tight">{t(`risk.${DEMO_HOME.level}`)}</p>
         <RiskScale level={DEMO_HOME.level} />
         <p className="text-[15px] leading-snug text-on-ink/85">{t('home.riskAdvice')}</p>
-        <ButtonLink to="/scan" className="w-full">
-          {t('home.ctaScan')}
+        <ButtonLink to="/report" className="w-full">
+          {t('home.ctaReport')}
           <ArrowRight aria-hidden className="size-5" strokeWidth={2.5} />
         </ButtonLink>
       </Card>

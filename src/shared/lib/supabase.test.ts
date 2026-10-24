@@ -10,7 +10,7 @@ describe('supabase: конфиг из env', () => {
     expect(config?.url).toBe('https://abcd.supabase.co')
   })
 
-  it('без переменных возвращает null (сканер скажет «не настроен»)', () => {
+  it('без переменных возвращает null (клиент скажет «не настроен»)', () => {
     expect(readSupabaseConfig({})).toBeNull()
   })
 

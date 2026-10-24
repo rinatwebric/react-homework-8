@@ -1,10 +1,9 @@
 /**
  * Доступ к Supabase из клиента.
  *
- * В срезе 1 клиент ходит только в Edge Function `analyze-photo` обычным fetch —
- * SDK базы пока не нужен (отчёты и карта — срез 2). В клиент попадают лишь
- * VITE_SUPABASE_URL и публичный ключ; service_role и ключ vision-модели — только
- * в секретах функций.
+ * Клиент вызывает Edge Functions обычным fetch (`submit-report`); SDK базы
+ * не нужен. В клиент попадают лишь VITE_SUPABASE_URL и публичный ключ;
+ * service_role и ключи моделей — только в секретах функций.
  */
 import { z } from 'zod'
 
@@ -15,7 +14,7 @@ const supabaseConfigSchema = z.object({
 
 export type SupabaseConfig = z.infer<typeof supabaseConfigSchema>
 
-/** Чистая функция: null, если переменные не заданы или битые (тогда сканер честно скажет об этом). */
+/** Чистая функция: null, если переменные не заданы или битые (тогда форма честно скажет об этом). */
 export function readSupabaseConfig(env: {
   url?: string | undefined
   anonKey?: string | undefined

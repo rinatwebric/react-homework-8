@@ -13,7 +13,6 @@
 import { z } from 'zod'
 import { distanceMeters } from '../lib/geo'
 import { REPORT_CATEGORIES } from '../lib/categories'
-import { residentRiskLevelSchema } from './ai-contract'
 
 /** Версия контракта: несовпадение — 400 INVALID_INPUT, чтобы не писать мусор в БД. */
 export const REPORT_CONTRACT_VERSION = '2.0'
@@ -30,7 +29,6 @@ export const deviceHashSchema = z.string().regex(/^[0-9a-f]{64}$/)
  * Путь объекта в бакете `report-photos` в формате `reports/<client_id>/<файл>`
  * (допускается и без префикса `reports/`). Первый сегмент-идентификатор обязан
  * совпадать с `client_id`: иначе чужое фото можно привязать к своему отчёту.
- * Такой же путь пишет `analyze-photo` при загрузке снимка.
  */
 const PHOTO_CLIENT_SEGMENT =
   /^(?:reports\/)?([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\/[\w.-]+$/
@@ -117,10 +115,3 @@ export const submitReportResponseSchema = z.object({
 })
 
 export type SubmitReportResponse = z.infer<typeof submitReportResponseSchema>
-
-/**
- * AI-оценка фото остаётся в контракте `analyze-photo`, но в заявку v2 не входит:
- * решение по срочности принимает триаж + модератор (§8). Тип держим здесь, чтобы
- * экран сканера (до PR-5) по-прежнему мог положить уровень риска в state.
- */
-export type PhotoRiskLevel = z.infer<typeof residentRiskLevelSchema>

@@ -26,7 +26,7 @@ export type DraftGps = {
 }
 
 export type ReportDraft = {
-  /** id заявки; при переходе со сканера совпадает с папкой фото. */
+  /** id заявки; при переходе с карты совпадает с папкой фото. */
   clientId: string
   deviceHash: string
   /** Категория из словаря `REPORT_CATEGORIES`; null — ещё не выбрана. */
