@@ -172,11 +172,10 @@ Deno.serve(async (req: Request) => {
       url,
       tag: `suutech-alert-${Date.now()}`,
     })
-    const encodedPayload = new TextEncoder().encode(payloadString)
-
     let sent = 0
     let failed = 0
     let removed = 0
+    const errors: string[] = []
 
     // Отправка пачками по 20
     const BATCH_SIZE = 20
@@ -185,20 +184,30 @@ Deno.serve(async (req: Request) => {
       await Promise.all(
         batch.map(async (sub) => {
           try {
-            await appServer.sendNotification(
-              {
-                endpoint: sub.endpoint,
-                keys: {
-                  p256dh: sub.keys.p256dh,
-                  auth: sub.keys.auth,
-                },
+            const rawKeys = sub.keys
+            const keys = typeof rawKeys === 'string' ? JSON.parse(rawKeys) : rawKeys
+            if (!keys?.p256dh || !keys?.auth) {
+              throw new Error('Subscription missing p256dh or auth keys')
+            }
+
+            const subscriber = appServer.subscribe({
+              endpoint: sub.endpoint,
+              keys: {
+                p256dh: keys.p256dh,
+                auth: keys.auth,
               },
-              encodedPayload,
-            )
+            })
+
+            await subscriber.pushTextMessage(payloadString, {
+              urgency: level === 'critical' ? 'high' : 'normal',
+              ttl: 86400,
+            })
             sent++
           } catch (err: unknown) {
             failed++
             const errStr = String((err as { message?: string })?.message || err)
+            errors.push(errStr)
+            console.error(`[send-push] Push failed for ${sub.endpoint}:`, errStr)
             // При 404/410 или unregistered/expired удаляем мёртвую подписку
             if (
               errStr.includes('404') ||
@@ -220,6 +229,7 @@ Deno.serve(async (req: Request) => {
       failed,
       removed,
       total_subscribers: totalSubscribers,
+      errors: errors.slice(0, 5),
     })
   } catch (err) {
     console.error('[send-push] Ошибка выполнения:', err)

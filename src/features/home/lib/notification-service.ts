@@ -44,6 +44,65 @@ export async function isPushSubscribed(): Promise<boolean> {
 }
 
 /**
+ * Бесшумная фоновая синхронизация Web Push подписки, если пользователь уже выдал разрешение
+ */
+export async function syncPushSubscriptionIfGranted(coords?: {
+  lat: number
+  lng: number
+}): Promise<boolean> {
+  if (typeof window === 'undefined' || typeof Notification === 'undefined') return false
+  if (Notification.permission !== 'granted') return false
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return false
+  const hasPush = typeof window.PushManager !== 'undefined' || typeof PushManager !== 'undefined'
+  if (!hasPush) return false
+
+  try {
+    const reg = await navigator.serviceWorker.ready
+    let subscription = await reg.pushManager.getSubscription()
+
+    if (!subscription) {
+      const convertedKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      subscription = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: convertedKey,
+      })
+    }
+
+    if (subscription) {
+      if (supabaseConfig) {
+        const subscribeUrl = `${supabaseConfig.url.replace(/\/+$/, '')}/functions/v1/subscribe-push`
+        await fetch(subscribeUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            apikey: supabaseConfig.anonKey,
+          },
+          body: JSON.stringify({
+            subscription: subscription.toJSON(),
+            area_lat: coords?.lat !== undefined ? Number(coords.lat.toFixed(2)) : null,
+            area_lng: coords?.lng !== undefined ? Number(coords.lng.toFixed(2)) : null,
+            zone_id: 'ak-olong',
+            lang: 'ru',
+          }),
+        }).catch((err) => {
+          console.warn('[notifications] Ошибка отправки подписки в Edge Function:', err)
+        })
+      }
+      try {
+        localStorage.setItem(PUSH_SUBSCRIBED_KEY, 'true')
+      } catch {
+        // ignore
+      }
+      return true
+    }
+    return false
+  } catch (err) {
+    console.warn('[notifications] Ошибка фоновой синхронизации push:', err)
+    return false
+  }
+}
+
+/**
  * Оформить реальную Web Push подписку на системные уведомления
  * (уведомления будут приходить даже при закрытом/свёрнутом приложении)
  */
@@ -153,6 +212,60 @@ export function countUnreadAlerts(alerts: AlertItem[]): number {
     const created = new Date(alert.created_at).getTime()
     return created > lastSeen
   }).length
+}
+
+/**
+ * Форматирование относительного времени для оповещений в стиле современных приложений
+ */
+export function formatRelativeTime(isoString: string, lang = 'ru'): string {
+  const timestamp = new Date(isoString).getTime()
+  if (Number.isNaN(timestamp)) return ''
+
+  const now = Date.now()
+  const diffSec = Math.max(0, Math.floor((now - timestamp) / 1000))
+
+  if (diffSec < 60) {
+    return lang === 'ky' ? 'Жаңы эле' : 'Только что'
+  }
+
+  const diffMin = Math.floor(diffSec / 60)
+  if (diffMin < 60) {
+    return lang === 'ky' ? `${diffMin} мүн мурун` : `${diffMin} мин назад`
+  }
+
+  const diffHours = Math.floor(diffMin / 60)
+  const dateObj = new Date(timestamp)
+  const nowDate = new Date(now)
+
+  const isToday =
+    dateObj.getDate() === nowDate.getDate() &&
+    dateObj.getMonth() === nowDate.getMonth() &&
+    dateObj.getFullYear() === nowDate.getFullYear()
+
+  const timeStr = dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+
+  if (isToday) {
+    if (diffHours < 4) {
+      return lang === 'ky' ? `${diffHours} саат мурун` : `${diffHours} ч назад`
+    }
+    return lang === 'ky' ? `Бүгүн, ${timeStr}` : `Сегодня, ${timeStr}`
+  }
+
+  const yesterday = new Date(now - 24 * 60 * 60 * 1000)
+  const isYesterday =
+    dateObj.getDate() === yesterday.getDate() &&
+    dateObj.getMonth() === yesterday.getMonth() &&
+    dateObj.getFullYear() === yesterday.getFullYear()
+
+  if (isYesterday) {
+    return lang === 'ky' ? `Кечээ, ${timeStr}` : `Вчера, ${timeStr}`
+  }
+
+  const dateStr = dateObj.toLocaleDateString(lang === 'ky' ? 'ky-KG' : 'ru-RU', {
+    day: 'numeric',
+    month: 'short',
+  })
+  return `${dateStr}, ${timeStr}`
 }
 
 /**

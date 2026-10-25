@@ -18,6 +18,7 @@ import {
   countUnreadAlerts,
   markAlertsAsSeen,
   notifyNewAlerts,
+  syncPushSubscriptionIfGranted,
 } from './lib/notification-service'
 import { getCachedLocationName, reverseGeocodeVillage } from './lib/user-village'
 import { RainWarningBanner } from '../weather/components/RainWarningBanner'
@@ -58,6 +59,14 @@ export function HomePage() {
       },
       { timeout: 8000, maximumAge: 60000 },
     )
+  }, [])
+
+  // Фоновая синхронизация Web Push подписки при наличии разрешений от пользователя
+  useEffect(() => {
+    void syncPushSubscriptionIfGranted({
+      lat: PILOT_ZONE.center.lat,
+      lng: PILOT_ZONE.center.lng,
+    })
   }, [])
 
   const { weather } = useWeather({
@@ -169,7 +178,12 @@ export function HomePage() {
       </header>
 
       {/* Выпадающий блок со списком активных оповещений службы при клике на колокольчик */}
-      {alertsOpen && <RecentAlertsList alerts={alerts} />}
+      {alertsOpen && (
+        <RecentAlertsList
+          alerts={alerts}
+          onMarkAllAsRead={() => setUnreadCount(0)}
+        />
+      )}
 
       {/* Оперативное предупреждение службы (Срез 5, ТЗ v2.0 §13) */}
       <ActiveAlertBanner />

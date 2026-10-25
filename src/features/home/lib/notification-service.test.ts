@@ -8,6 +8,8 @@ import {
   urlBase64ToUint8Array,
   isPushSubscribed,
   subscribeToPushNotifications,
+  syncPushSubscriptionIfGranted,
+  formatRelativeTime,
   VAPID_PUBLIC_KEY,
 } from './notification-service'
 import type { AlertItem } from '../../alerts/types'
@@ -252,6 +254,69 @@ describe('notification-service', () => {
       const result = await subscribeToPushNotifications({ lat: 42.13, lng: 76.88 })
       expect(result).toBe(true)
       expect(subscribeMock).toHaveBeenCalledTimes(1)
+    })
+  })
+
+  describe('formatRelativeTime', () => {
+    it('форматирует свежее время как "Только что"', () => {
+      const justNow = new Date(Date.now() - 10000).toISOString()
+      expect(formatRelativeTime(justNow, 'ru')).toBe('Только что')
+      expect(formatRelativeTime(justNow, 'ky')).toBe('Жаңы эле')
+    })
+
+    it('форматирует несколько минут назад', () => {
+      const fiveMinAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString()
+      expect(formatRelativeTime(fiveMinAgo, 'ru')).toBe('5 мин назад')
+      expect(formatRelativeTime(fiveMinAgo, 'ky')).toBe('5 мүн мурун')
+    })
+
+    it('возвращает пустую строку для невалидной даты', () => {
+      expect(formatRelativeTime('invalid-date')).toBe('')
+    })
+  })
+
+  describe('syncPushSubscriptionIfGranted', () => {
+    it('не выполняет синхронизацию, если права не выданы', async () => {
+      // @ts-ignore
+      globalThis.Notification = { permission: 'default' }
+      // @ts-ignore
+      globalThis.window.Notification = { permission: 'default' }
+
+      const synced = await syncPushSubscriptionIfGranted()
+      expect(synced).toBe(false)
+    })
+
+    it('выполняет синхронизацию, если права уже granted', async () => {
+      const mockSub = {
+        endpoint: 'https://push.test/sub-sync',
+        toJSON: () => ({ endpoint: 'https://push.test/sub-sync', keys: { p256dh: 'k1', auth: 'k2' } }),
+      }
+      const subscribeMock = vi.fn().mockResolvedValue(mockSub)
+
+      // @ts-ignore
+      globalThis.PushManager = {}
+      // @ts-ignore
+      globalThis.window.PushManager = {}
+      // @ts-ignore
+      globalThis.Notification = { permission: 'granted' }
+      // @ts-ignore
+      globalThis.window.Notification = { permission: 'granted' }
+      vi.stubGlobal('navigator', {
+        serviceWorker: {
+          ready: Promise.resolve({
+            pushManager: {
+              getSubscription: vi.fn().mockResolvedValue(mockSub),
+              subscribe: subscribeMock,
+            },
+          }),
+        },
+      })
+
+      // Stub fetch
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, json: () => Promise.resolve({ ok: true }) }))
+
+      const synced = await syncPushSubscriptionIfGranted({ lat: 42.13, lng: 76.88 })
+      expect(synced).toBe(true)
     })
   })
 })
